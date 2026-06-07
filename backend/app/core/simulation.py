@@ -170,17 +170,21 @@ class SimulationEngine:
                 pass
 
     def _select_active_agents(self) -> list[AgentState]:
+        import random
         active = []
+        sleeping = []
         for agent in self.agents:
             if agent.needs.energy < 10:
                 active.append(agent)
             elif agent.current_activity == "sleeping" and self.tick_count % 5 != 0:
                 continue
-            elif agent.is_moving:
-                active.append(agent)
+            elif agent.current_activity == "sleeping":
+                sleeping.append(agent)
             else:
                 active.append(agent)
-        return active
+        # Prioritize sleeping agents so they get processed
+        random.shuffle(active)
+        return sleeping + active
 
     def _process_result(self, result: dict, sim_time: datetime) -> None:
         agent_name = result["agent_name"]

@@ -46,6 +46,8 @@ class AgentRuntime:
     async def process_agent(self, agent: AgentState, sim_time: datetime,
                               all_agents: list[AgentState]) -> dict:
         """Main cognitive cycle for one agent."""
+        import logging
+        _log = logging.getLogger("maplewood.runtime")
         result = {
             "agent_id": agent.id,
             "agent_name": agent.name,
@@ -69,7 +71,9 @@ class AgentRuntime:
             # 2. Check if we should wake up (time-based)
             hour = sim_time.hour
             if agent.current_activity == "sleeping":
-                if self._should_wake(agent, hour):
+                should_wake = self._should_wake(agent, hour)
+                _log.info(f"WAKE_CHECK: {agent.name} hour={hour} should_wake={should_wake} energy={agent.needs.energy:.0f}")
+                if should_wake:
                     await self._do_morning_routine(agent, sim_time, all_agents)
                     result["actions"].append(f"{agent.name} woke up and started morning routine")
                 return result
