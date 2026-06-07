@@ -163,7 +163,7 @@ class SimulationEngine:
             await self.save_state()
 
         # Broadcast
-        if self._broadcast and self.tick_count % 3 == 0:  # Every 3 ticks
+        if self._broadcast and self.tick_count % 1 == 0:  # Every tick
             try:
                 await self._broadcast(self.get_state())
             except Exception:

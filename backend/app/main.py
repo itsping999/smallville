@@ -137,10 +137,13 @@ async def websocket_endpoint(ws: WebSocket):
             msg = json.loads(data)
             if msg.get("action") == "start":
                 await engine.start()
+                await ws.send_text(json.dumps(engine.get_state(), default=str))
             elif msg.get("action") == "stop":
                 await engine.stop()
+                await ws.send_text(json.dumps(engine.get_state(), default=str))
             elif msg.get("action") == "speed":
                 engine.clock.set_speed(float(msg.get("value", 60)))
+                await ws.send_text(json.dumps(engine.get_state(), default=str))
     except WebSocketDisconnect:
         pass
     finally:
