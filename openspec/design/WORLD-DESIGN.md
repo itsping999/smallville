@@ -1,8 +1,8 @@
-# World Design — Maplewood Community
+# World Design — Smallville Community
 
 ## Geographic Layout
 
-Maplewood is a small US suburban community inspired by neighborhoods in Portland, OR and Chapel Hill, NC. The layout follows a realistic street grid with curved residential roads, green spaces, and a walkable main street.
+Smallville is a small US suburban community inspired by neighborhoods in Portland, OR and Chapel Hill, NC. The layout follows a realistic street grid with curved residential roads, green spaces, and a walkable main street.
 
 ## Map Grid
 
@@ -78,7 +78,7 @@ N
 
 | Location | Type | Staff | Objects |
 |----------|------|-------|---------|
-| Maplewood Elementary | School | Teachers: Sarah Chen, Mr. Park | Classrooms(3), Playground, Principal Office, Gym |
+| Smallville Elementary | School | Teachers: Sarah Chen, Mr. Park | Classrooms(3), Playground, Principal Office, Gym |
 | Community Center | Community | Staff: admin | Gym(Treadmills, Weights), Meeting Rooms(2), Lobby |
 | Elm Park | Park | Public | Playground, Walking Trail, Pond, Gazebo, 8 Benches, Fountain |
 | Fire Station | Emergency | Firefighters | Truck bay, Living quarters, Dispatch |
@@ -89,7 +89,7 @@ N
 |----------|------|-------|---------|
 | Town Hall | Government | Mayor, Clerks | Mayor Office, Clerk Office, Meeting Room, Lobby |
 | Riverside Tech | Tech Startup | Engineers: Kai, others | Open Office(6 desks), Conference Room, Kitchen, Server Room |
-| Maplewood Medical Center | Medical | Doctor, Nurse | Reception, Exam Rooms(2), Pharmacy, Waiting Area |
+| Smallville Medical Center | Medical | Doctor, Nurse | Reception, Exam Rooms(2), Pharmacy, Waiting Area |
 | Community Library | Library | Librarian | Reading Area, Computer Lab(4 PCs), Children Section, Checkout |
 
 ## Street Network

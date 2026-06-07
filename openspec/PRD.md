@@ -1,4 +1,4 @@
-# Maplewood — Product Requirements Document (PRD)
+# Smallville — Product Requirements Document (PRD)
 
 **Version**: 1.0
 **Date**: 2026-06-07
@@ -9,9 +9,9 @@
 
 ## 1. Product Vision
 
-Maplewood simulates a small American suburban community where every resident is an AI agent driven by a Large Language Model. Each agent has a unique identity (name, age, occupation, personality, interests, financial disposition, health history), maintains a memory stream, reflects on experiences, makes plans, and executes decisions that chain into realistic multi-step behaviors.
+Smallville simulates a small American suburban community where every resident is an AI agent driven by a Large Language Model. Each agent has a unique identity (name, age, occupation, personality, interests, financial disposition, health history), maintains a memory stream, reflects on experiences, makes plans, and executes decisions that chain into realistic multi-step behaviors.
 
-Unlike the original paper's proof-of-concept, Maplewood adds:
+Unlike the original paper's proof-of-concept, Smallville adds:
 - Realistic body systems (hunger, fatigue, health, hygiene)
 - Financial behaviors (earning, spending, saving, investing, housing)
 - Emotional states that influence decision-making
@@ -37,7 +37,7 @@ Unlike the original paper's proof-of-concept, Maplewood adds:
 
 ---
 
-## 2. World: Maplewood Community
+## 2. World: Smallville Community
 
 ### 2.1 Setting
 
@@ -57,7 +57,7 @@ A small American suburban community inspired by neighborhoods in Portland, Orego
 - Corner Pharmacy: pharmacy + convenience items
 
 **Community**
-- Maplewood Elementary School
+- Smallville Elementary School
 - Community Center: meeting rooms, gym
 - Elm Park: playground, walking trails, pond, gazebo
 - Fire Station
@@ -65,7 +65,7 @@ A small American suburban community inspired by neighborhoods in Portland, Orego
 **Workplaces**
 - Town Hall: government offices
 - Riverside Tech: small tech startup office
-- Maplewood Medical Center: clinic + pharmacy
+- Smallville Medical Center: clinic + pharmacy
 - Community Library: public library with computers
 
 **Transportation**
@@ -79,7 +79,7 @@ A small American suburban community inspired by neighborhoods in Portland, Orego
 Tree-structured hierarchy where each node is a Location:
 
 ```
-Maplewood (root)
+Smallville (root)
 ├── Oak Lane (residential street)
 │   ├── House 1 (Agent A's home)
 │   │   ├── Bedroom
@@ -99,7 +99,7 @@ Maplewood (root)
 │   ├── Pages Bookstore
 │   └── Corner Pharmacy
 ├── Community Facilities
-│   ├── Maplewood Elementary
+│   ├── Smallville Elementary
 │   │   ├── Classroom A/B/C
 │   │   ├── Playground
 │   │   └── Principal's Office
@@ -122,7 +122,7 @@ Maplewood (root)
 │   │   ├── Open Office
 │   │   ├── Conference Room
 │   │   └── Kitchen
-│   ├── Maplewood Medical Center
+│   ├── Smallville Medical Center
 │   │   ├── Reception
 │   │   ├── Exam Room 1/2
 │   │   └── Pharmacy

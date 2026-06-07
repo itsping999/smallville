@@ -16,7 +16,7 @@ from app.services.social_service import SocialService
 from app.services.transport import TransportService
 from app.config import REFLECTION_THRESHOLD
 
-logger = logging.getLogger("maplewood.runtime")
+logger = logging.getLogger("smallville.runtime")
 
 # Event chains: complex actions decomposed into sub-actions
 EVENT_CHAINS = {
@@ -47,7 +47,7 @@ class AgentRuntime:
                               all_agents: list[AgentState]) -> dict:
         """Main cognitive cycle for one agent."""
         import logging
-        _log = logging.getLogger("maplewood.runtime")
+        _log = logging.getLogger("smallville.runtime")
         result = {
             "agent_id": agent.id,
             "agent_name": agent.name,

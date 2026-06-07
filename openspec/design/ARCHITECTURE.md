@@ -2,7 +2,7 @@
 
 ## Overview
 
-Maplewood uses a layered architecture separating simulation, cognition, LLM integration, and presentation.
+Smallville uses a layered architecture separating simulation, cognition, LLM integration, and presentation.
 
 ```
 +--------------------------------------------------+

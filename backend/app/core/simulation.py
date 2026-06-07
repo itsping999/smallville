@@ -19,7 +19,7 @@ from app.data.agents import create_agents
 from app.data.world import create_world
 from app.config import TICK_INTERVAL, BATCH_SIZE, SAVE_INTERVAL_MINUTES, SAVES_DIR
 
-logger = logging.getLogger("maplewood.sim")
+logger = logging.getLogger("smallville.sim")
 
 
 class SimulationClock:

@@ -92,7 +92,7 @@ Medical visits triggered when:
 - Annual checkup due (health-conscious agents)
 
 Medical visit flow:
-1. Commute to Maplewood Medical Center
+1. Commute to Smallville Medical Center
 2. Check in at reception (wait 10-30 sim-minutes)
 3. See doctor (30-60 sim-minutes)
 4. Receive treatment/prescription

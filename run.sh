@@ -15,5 +15,5 @@ if [ ! -f "../.env" ]; then
     echo "Created .env from .env.example — edit with your LLM endpoint"
 fi
 
-echo "Starting Maplewood on http://localhost:8080"
+echo "Starting Smallville on http://localhost:8080"
 exec .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload

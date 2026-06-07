@@ -1,4 +1,4 @@
-# Maplewood — AI Agent Community Simulation
+# Smallville — AI Agent Community Simulation
 
 An autonomous multi-agent simulation where LLM-driven agents live realistic lives in a US suburban community. Each agent has independent identity, memory, reflection, planning, and decision-making driven by a Large Language Model. Social relationships, collective events, financial behaviors, and cultural norms emerge organically from individual actions.
 
@@ -38,7 +38,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
 ## OpenSpec Conventions
 
 - [Paper] — directly from the Stanford Generative Agents paper
-- [Extended] — Maplewood-specific extensions for realism
+- [Extended] — Smallville-specific extensions for realism
 - [Engineering] — implementation decisions not in the paper
 
 ## Scope Phases

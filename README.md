@@ -1,11 +1,11 @@
-# Maplewood — AI Agent Community Simulation
+# Smallville — AI Agent Community Simulation
 
 An autonomous multi-agent simulation where LLM-driven agents live realistic lives in a US suburban community.
 
 ## Quick Start
 
 ```bash
-cd maplewood
+cd smallville
 ./run.sh
 # Open http://localhost:8080
 ```
@@ -19,7 +19,7 @@ cd maplewood
 
 ## Agents
 
-8 predefined residents of Maplewood, each with unique personality, occupation, financial situation, and life story.
+8 predefined residents of Smallville, each with unique personality, occupation, financial situation, and life story.
 
 ## Systems
 

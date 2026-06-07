@@ -1,4 +1,4 @@
-"""Maplewood — FastAPI application."""
+"""Smallville — FastAPI application."""
 from __future__ import annotations
 import asyncio
 import json
@@ -14,7 +14,7 @@ from app.core.simulation import SimulationEngine
 from app.config import FRONTEND_DIR, HOST, PORT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-logger = logging.getLogger("maplewood")
+logger = logging.getLogger("smallville")
 
 engine = SimulationEngine()
 ws_clients: set[WebSocket] = set()
@@ -35,13 +35,13 @@ async def broadcast(state: dict):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     engine.set_broadcast(broadcast)
-    logger.info("Maplewood backend starting...")
+    logger.info("Smallville backend starting...")
     yield
     await engine.llm.close()
-    logger.info("Maplewood backend stopping...")
+    logger.info("Smallville backend stopping...")
 
 
-app = FastAPI(title="Maplewood", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Smallville", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # ── REST API ───────────────────────────────────────────────

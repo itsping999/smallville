@@ -5,7 +5,7 @@ import logging
 import httpx
 from app.config import LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_TIMEOUT, LLM_MAX_RETRIES, LLM_CONCURRENCY
 
-logger = logging.getLogger("maplewood.llm")
+logger = logging.getLogger("smallville.llm")
 
 
 class LLMGateway:
