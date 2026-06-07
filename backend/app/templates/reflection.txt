@@ -1,0 +1,8 @@
+You are {{ agent_name }}. {{ personality_desc }}
+
+You are reflecting on your recent experiences:
+
+{{ memories }}
+
+Generate 1-2 sentences of personal insight or realization based on these experiences.
+Think about patterns, relationships, or changes in your life.

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maplewood — AI Community Simulation</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div>Connecting to Maplewood...</div>
+  </div>
+
+  <div id="app">
+    <!-- Top Bar -->
+    <div id="top-bar">
+      <div class="sim-info">
+        <span class="sim-time" id="sim-time">Mon Jun 8, 6:00 AM</span>
+        <span class="weather" id="weather">Sunny 72°F</span>
+        <span id="day-num" style="color:var(--text-secondary);font-size:12px">Day 1</span>
+      </div>
+      <div class="speed-controls">
+        <button class="speed-btn" onclick="setSpeed(0)" id="btn-pause">⏸</button>
+        <button class="speed-btn" onclick="setSpeed(1)" id="btn-1x">1x</button>
+        <button class="speed-btn" onclick="setSpeed(10)" id="btn-10x">10x</button>
+        <button class="speed-btn active" onclick="setSpeed(60)" id="btn-60x">60x</button>
+        <button class="speed-btn" onclick="setSpeed(120)" id="btn-120x">120x</button>
+      </div>
+      <div class="stats">
+        <span id="stat-agents">8 agents</span>
+        <span id="stat-conversations">0 conversations</span>
+        <span id="stat-actions">0 actions</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-content">
+      <!-- Left Sidebar -->
+      <div id="sidebar">
+        <div class="sidebar-header">🏘️ Residents</div>
+        <div class="agent-list" id="agent-list"></div>
+      </div>
+
+      <!-- Map -->
+      <div id="map-container"></div>
+
+      <!-- Right Detail Panel -->
+      <div id="detail-panel">
+        <div class="panel-header">
+          <h3 id="detail-name">Agent Name</h3>
+          <button class="close-btn" onclick="closeDetail()">×</button>
+        </div>
+        <div id="detail-content"></div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div id="event-log">
+      <div class="log-header">
+        <span>📋 Community Events</span>
+        <span id="log-count" style="font-size:11px;color:var(--text-secondary)">0 events</span>
+      </div>
+      <div class="log-list" id="log-list"></div>
+    </div>
+  </div>
+
+  <script src="/lib/phaser.min.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
