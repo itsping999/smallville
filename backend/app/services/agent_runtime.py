@@ -122,18 +122,23 @@ class AgentRuntime:
 
     def _should_wake(self, agent: AgentState, hour: int) -> bool:
         """Determine if agent should wake up."""
+        # Everyone wakes by 9 AM at latest (even night owls)
+        if hour >= 9:
+            return True
+        # High energy + past 5 AM -> wake
         if agent.needs.energy > 70 and hour >= 5:
             return True
-        # Conscientious agents wake on schedule
+        # Workers with fixed schedules
+        if "Retired" not in agent.occupation and agent.workplace_id:
+            if hour >= 7:  # All workers up by 7
+                return True
+        # Conscientious agents wake early
         if agent.personality.conscientiousness > 0.3:
-            if agent.occupation in ("Elementary school teacher",):
-                return hour >= 6
-            if "Retired" in agent.occupation:
-                return hour >= 7
             return hour >= 6
-        # Spontaneous agents sleep in
-        if agent.personality.conscientiousness < -0.2:
-            return hour >= 8
+        # Cafe owners get up early (they open at 6!)
+        if "cafe" in agent.occupation.lower() or "cafe" in (agent.workplace_id or "").lower():
+            return hour >= 5
+        # Default
         return hour >= 7
 
     async def _do_morning_routine(self, agent: AgentState, sim_time: datetime,
@@ -236,6 +241,7 @@ Actions: move_to:<location>, use:<object>, converse:<person>, eat, work, exercis
     async def _execute_action(self, agent: AgentState, action_text: str,
                                 sim_time: datetime, all_agents: list[AgentState]) -> str:
         """Parse and execute the LLM's chosen action."""
+        hour = sim_time.hour
         # Clean up LLM output - extract just the action part
         cleaned = action_text.strip()
         # Handle "ACTION:reason" format
@@ -301,7 +307,8 @@ Actions: move_to:<location>, use:<object>, converse:<person>, eat, work, exercis
             if agent.location_id == agent.workplace_id:
                 agent.current_activity = "working"
                 agent.needs.fun = max(0, agent.needs.fun - 3)
-                return "Working at {agent.workplace_id.replace('_', ' ').title()}"
+                place = agent.workplace_id.replace("_", " ").title()
+                return f"Working at {place}"
             elif sim_time.weekday() < 5 and 8 <= sim_time.hour <= 17:
                 mode = self.transport.choose_transport(agent,
                     self.transport.get_distance(agent.location_id, agent.workplace_id))
