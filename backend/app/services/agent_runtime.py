@@ -246,19 +246,39 @@ Actions: move_to:<location>, use:<object>, converse:<person>, eat, work, exercis
                                 sim_time: datetime, all_agents: list[AgentState]) -> str:
         """Parse and execute the LLM's chosen action."""
         hour = sim_time.hour
-        # Clean up LLM output - extract just the action part
-        cleaned = action_text.strip()
-        # Handle "ACTION:reason" format
-        if "ACTION:" in cleaned.upper():
-            cleaned = cleaned.upper().split("ACTION:", 1)[1].strip()
-        # Handle "move_to:location - reason" format  
-        if " - " in cleaned and any(k in cleaned.lower() for k in ["move_to", "use:", "converse:", "eat", "work", "exercise"]):
-            cleaned = cleaned.split(" - ", 1)[0].strip()
-        # Handle "use:object:reason" format
-        parts = cleaned.split(":")
-        if len(parts) > 2 and parts[0].strip().lower() in ["use", "move_to", "converse"]:
-            cleaned = parts[0].strip() + ":" + parts[1].strip()
-        
+        # Clean up LLM output — extract just the action keyword
+        raw = action_text.strip()
+        cleaned = raw
+
+        # Strip "ACTION:" prefix (case-insensitive)
+        upper = cleaned.upper()
+        if "ACTION:" in upper:
+            idx = upper.index("ACTION:")
+            cleaned = cleaned[idx + 7:].strip()
+
+        # Strip leading "reason:" or "reason -" style
+        for prefix in ["reason:", "reason -", "reason: "]:
+            if cleaned.lower().startswith(prefix):
+                cleaned = cleaned[len(prefix):].strip()
+
+        # Take only the action:target part, discard everything after " - " or "Reason:" or first sentence
+        for sep in [" - ", " -- ", " because ", " Reason:", " reason:", ". ", "\n"]:
+            pos = cleaned.find(sep)
+            if pos > 0:
+                cleaned = cleaned[:pos].strip()
+                break
+
+        # If still verbose (>50 chars), try to extract just the use:/move_to:/converse: part
+        if len(cleaned) > 50:
+            import re
+            m = re.search(r"(use|move_to|converse|eat|work|exercise|read|relax|shop|sleep|browse|chat|cook)[:\s_]([^:,;.(]{2,25})", cleaned, re.IGNORECASE)
+            if m:
+                cleaned = f"{m.group(1)}:{m.group(2).strip()}"
+
+        # Final cap
+        if len(cleaned) > 45:
+            cleaned = cleaned[:42].rsplit(" ", 1)[0] + "..."
+
         action_lower = cleaned.lower()
 
         # Move to location
@@ -341,9 +361,9 @@ Actions: move_to:<location>, use:<object>, converse:<person>, eat, work, exercis
                 self.transport.start_movement(agent, target, mode, sim_time.hour)
                 return f"Going shopping at {target}"
 
-        # Default
+        # Default — set activity and return cleaned text
         agent.current_activity = "idle"
-        return action_text[:80]
+        return cleaned if cleaned else "Idle"
 
     def _find_location_id(self, hint: str) -> Optional[str]:
         """Map a location hint to a known location ID."""

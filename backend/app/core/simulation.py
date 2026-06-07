@@ -203,7 +203,7 @@ class SimulationEngine:
                 "time": sim_time.strftime("%I:%M %p"),
                 "type": "conversation",
                 "icon": "\U0001f4ac",
-                "text": f"{agent_name} talked with {conv['with']}: {conv['summary']}",
+                "text": f"{agent_name} chatted with {conv['with']}",
                 "agent_id": result["agent_id"],
             })
             self.stats["total_conversations"] += 1
