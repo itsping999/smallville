@@ -1,35 +1,46 @@
-"""Maplewood configuration from environment variables."""
+"""Runtime configuration for the Smallville API."""
+from __future__ import annotations
+
 import os
-from dotenv import load_dotenv
+from dataclasses import dataclass
+from pathlib import Path
 
-load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - python-dotenv is a runtime dependency.
+    load_dotenv = None
 
-# LLM
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://112.5.167.211:58788/v1")
-LLM_API_KEY = os.getenv("LLM_API_KEY", "sk-placeholder")
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-5.5")
-LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "30"))
-LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
-LLM_CONCURRENCY = int(os.getenv("LLM_CONCURRENCY", "3"))
 
-# Simulation
-SIM_SPEED = float(os.getenv("SIM_SPEED", "60"))  # seconds per sim-minute
-TICK_INTERVAL = float(os.getenv("TICK_INTERVAL", "1.0"))  # real seconds per tick
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", "5"))
-SAVE_INTERVAL_MINUTES = int(os.getenv("SAVE_INTERVAL_MINUTES", "10"))
-REFLECTION_THRESHOLD = float(os.getenv("REFLECTION_THRESHOLD", "150"))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = PROJECT_ROOT / ".env"
 
-# Memory retrieval weights
-MEMORY_ALPHA = float(os.getenv("MEMORY_ALPHA", "1.0"))   # recency
-MEMORY_BETA = float(os.getenv("MEMORY_BETA", "1.0"))     # importance
-MEMORY_GAMMA = float(os.getenv("MEMORY_GAMMA", "1.0"))   # relevance
-MEMORY_K = int(os.getenv("MEMORY_K", "15"))
+if load_dotenv:
+    load_dotenv(ENV_FILE)
 
-# Server
-HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", "8080"))
 
-# Paths
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SAVES_DIR = os.path.join(BASE_DIR, "saves")
-FRONTEND_DIR = os.path.join(BASE_DIR, "frontend", "public")
+def _bool_env(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True)
+class Settings:
+    """Filesystem and LLM settings shared by API routes."""
+
+    project_root: Path = PROJECT_ROOT
+    storage_dir: Path = PROJECT_ROOT / "data" / "storage"
+    compressed_storage_dir: Path = PROJECT_ROOT / "data" / "compressed_storage"
+    temp_storage_dir: Path = PROJECT_ROOT / "data" / "temp_storage"
+    static_dir: Path = PROJECT_ROOT / "backend" / "static"
+    frontend_dist_dir: Path = PROJECT_ROOT / "frontend" / "dist"
+    llm_base_url: str = os.getenv("LLM_BASE_URL", "")
+    llm_model: str = os.getenv("LLM_MODEL", "")
+    llm_completion_model: str = os.getenv("LLM_COMPLETION_MODEL", "")
+    llm_embedding_model: str = os.getenv("LLM_EMBEDDING_MODEL", "")
+    llm_disable_embeddings: bool = _bool_env(os.getenv("LLM_DISABLE_EMBEDDINGS"), False)
+    llm_api_key_configured: bool = bool(os.getenv("LLM_API_KEY"))
+    debug: bool = _bool_env(os.getenv("DEBUG"), False)
+
+
+settings = Settings()
