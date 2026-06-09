@@ -62,9 +62,11 @@ export default function PhaserGame(props: Props) {
     const preDir: Record<string, string> = {};
 
     const personaSprites: Record<string, Phaser.Types.Physics.Arcade.SpriteWithDynamicBody> = {};
+    const personaSleepSprites: Record<string, Phaser.GameObjects.Sprite> = {};
     const personaLabels: Record<string, Phaser.GameObjects.Text> = {};
     const personaMarkers: Record<string, Phaser.GameObjects.Ellipse> = {};
     const personaSleeping: Record<string, boolean> = {};
+    let isBedTile = (_x: number, _y: number) => false;
 
     const getInitials = (name: string) => {
       const rgx = /(\p{L}{1})\p{L}+/gu;
@@ -72,17 +74,35 @@ export default function PhaserGame(props: Props) {
       return ((initials.shift()?.[1] || "") + (initials.pop()?.[1] || "")).toUpperCase();
     };
 
+    const tileToBody = (tile: [number, number]) => [tile[0] * TILE, tile[1] * TILE] as [number, number];
+    const tileToStandingPoint = (tile: [number, number]) => ({
+      x: tile[0] * TILE + TILE / 2,
+      y: tile[1] * TILE + TILE,
+    });
+    const tileToSleepPoint = (tile: [number, number], data?: any) => {
+      const description = String(data?.description || "");
+      const centeredBedOffset = description.includes(":bed")
+        ? (isBedTile(tile[0] - 1, tile[1]) ? -TILE / 2 : isBedTile(tile[0] + 1, tile[1]) ? TILE / 2 : 0)
+        : 0;
+      return {
+        x: tile[0] * TILE + TILE / 2 + centeredBedOffset,
+        y: tile[1] * TILE + TILE / 2 + 4,
+      };
+    };
+
     const syncPersonaOverlay = (name: string) => {
       const sprite = personaSprites[name];
+      const sleepSprite = personaSleepSprites[name];
       const label = personaLabels[name];
       const marker = personaMarkers[name];
       if (!sprite || !label || !marker) return;
 
       if (personaSleeping[name]) {
-        label.x = sprite.body.x - 4;
-        label.y = sprite.body.y - 46;
-        marker.x = sprite.body.x + TILE / 2;
-        marker.y = sprite.body.y + TILE / 2;
+        const visual = sleepSprite || sprite;
+        label.x = visual.x - 28;
+        label.y = visual.y - 40;
+        marker.x = visual.x;
+        marker.y = visual.y + 6;
       } else {
         label.x = sprite.body.x - 6;
         label.y = sprite.body.y - 74;
@@ -93,18 +113,32 @@ export default function PhaserGame(props: Props) {
 
     const applyPersonaPose = (name: string, data: any) => {
       const sprite = personaSprites[name];
+      const sleepSprite = personaSleepSprites[name];
       const marker = personaMarkers[name];
-      if (!sprite || !marker) return;
+      if (!sprite || !sleepSprite || !marker) return;
 
       const description = String(data?.description || "").toLowerCase();
       const sleepingOnBed = description.includes("sleeping") && description.includes(":bed");
       personaSleeping[name] = sleepingOnBed;
 
       if (sleepingOnBed) {
+        const tile = (data?.movement || [
+          Math.round(sprite.body.x / TILE),
+          Math.round(sprite.body.y / TILE),
+        ]) as [number, number];
+        const sleepPoint = tileToSleepPoint(tile, data);
         sprite.anims.stop();
         sprite.setVisible(false);
-        marker.setDisplaySize(58, 24).setAlpha(0.9).setDepth(3.2);
+        sleepSprite
+          .setVisible(true)
+          .setTexture("atlas", "misa-right")
+          .setAngle(90)
+          .setScale(1.05)
+          .setDepth(3.5)
+          .setPosition(sleepPoint.x, sleepPoint.y);
+        marker.setDisplaySize(50, 20).setAlpha(0.22).setDepth(3.1);
       } else {
+        sleepSprite.setVisible(false);
         sprite.setVisible(true).setAngle(0).setScale(1.28).setDepth(3);
         marker.setDisplaySize(34, 18).setAlpha(0.78).setDepth(2.8);
       }
@@ -157,10 +191,26 @@ export default function PhaserGame(props: Props) {
       this.load.image("CuteRPG_Forest_C", "/static/assets/the_ville/visuals/map_assets/cute_rpg_word_VXAce/tilesets/CuteRPG_Forest_C.png");
       this.load.tilemapTiledJSON("map", "/static/assets/the_ville/visuals/the_ville_jan7.json");
       this.load.atlas("atlas", "/static/img/atlas/atlas.png", "/static/img/atlas/atlas.json");
+      this.load.text("game_object_maze", "/static/assets/the_ville/matrix/maze/game_object_maze.csv");
+      this.load.text("game_object_blocks", "/static/assets/the_ville/matrix/special_blocks/game_object_blocks.csv");
     }
 
     function create(this: Phaser.Scene) {
       const map = this.make.tilemap({ key: "map" });
+      const objectMaze = String(this.cache.text.get("game_object_maze") || "")
+        .split(",")
+        .map((cell) => cell.trim());
+      const bedIds = new Set(
+        String(this.cache.text.get("game_object_blocks") || "")
+          .split(/\r?\n/)
+          .map((line) => line.split(",").map((cell) => cell.trim()))
+          .filter((row) => row[0] && row[row.length - 1] === "bed")
+          .map((row) => row[0])
+      );
+      isBedTile = (x: number, y: number) => {
+        if (x < 0 || y < 0 || x >= map.width || y >= map.height) return false;
+        return bedIds.has(objectMaze[y * map.width + x]);
+      };
       const collisions = map.addTilesetImage("blocks", "blocks_1")!;
       const walls = map.addTilesetImage("Room_Builder_32x32", "walls")!;
       const ip1 = map.addTilesetImage("interiors_pt1", "interiors_pt1")!;
@@ -266,8 +316,7 @@ export default function PhaserGame(props: Props) {
 
       for (const [index, name] of Object.keys(personaInitPos).entries()) {
         const pos = personaInitPos[name];
-        const sx = pos[0] * TILE + TILE / 2;
-        const sy = pos[1] * TILE + TILE;
+        const { x: sx, y: sy } = tileToStandingPoint(pos);
         const markerColor = Phaser.Display.Color.HexStringToColor(AGENT_COLORS[index % AGENT_COLORS.length]).color;
         personaMarkers[name] = this.add.ellipse(sx, sy - 8, 34, 18, markerColor, 0.78)
           .setStrokeStyle(4, 0xffffff, 0.95)
@@ -275,6 +324,9 @@ export default function PhaserGame(props: Props) {
         const sprite = this.physics.add.sprite(sx, sy, "atlas", "misa-front")
           .setSize(30, 40).setOffset(0, 32).setScale(1.28).setDepth(3);
         personaSprites[name] = sprite;
+        personaSleepSprites[name] = this.add.sprite(sx, sy, "atlas", "misa-right")
+          .setVisible(false)
+          .setDepth(3.5);
         personaLabels[name] = this.add.text(sx - 6, sy - 74, "", {
           font: "32px monospace",
           color: "#101712",
@@ -353,9 +405,10 @@ export default function PhaserGame(props: Props) {
           for (const name of names) {
             const pd = executeMovement.persona[name] ?? executeMovement.persona[name.replace(/_/g, " ")];
             if (!pd) continue;
-            movementTarget[name] = [pd.movement[0] * TILE, pd.movement[1] * TILE];
+            movementTarget[name] = tileToBody(pd.movement);
             const ini = getInitials(name);
-            personaLabels[name].setText(ini + ": " + (pd.pronunciatio || ""));
+            const isSleeping = String(pd.description || "").toLowerCase().includes("sleeping") && String(pd.description || "").includes(":bed");
+            personaLabels[name].setText(isSleeping ? `${ini} zzz` : ini + ": " + (pd.pronunciatio || ""));
             applyPersonaPose(name, pd);
             onPersonaUpdate?.(name, pd);
           }
