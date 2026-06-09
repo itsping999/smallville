@@ -75,6 +75,7 @@ class LiveReverieRunner:
             self._server = self._build_server()
             while not self._stop.is_set():
                 self._server.start_server(1)
+                self._ensure_next_environment()
                 self._write_current_step()
                 with contextlib.suppress(Exception):
                     self._server.save()
@@ -183,6 +184,20 @@ class LiveReverieRunner:
                 "y": movement_xy[1],
             }
         env_file.write_text(json.dumps(environment, indent=2))
+
+    def _ensure_next_environment(self) -> None:
+        if self._server is None:
+            return
+
+        target = self.cfg.storage_dir / self.cfg.reverie_live_sim_code
+        next_step = int(self._server.step)
+        previous_step = next_step - 1
+        movement_file = target / "movement" / f"{previous_step}.json"
+        if not movement_file.exists():
+            return
+
+        movement = json.loads(movement_file.read_text())
+        self._ensure_environment_for_step(target, next_step, movement)
 
     def _write_current_sim(self) -> None:
         self.cfg.temp_storage_dir.mkdir(parents=True, exist_ok=True)
