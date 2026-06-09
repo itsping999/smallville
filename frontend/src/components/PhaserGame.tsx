@@ -21,8 +21,9 @@ const SPEED = 32;
 const CAMERA_MIN_ZOOM = 0.18;
 const CAMERA_MAX_ZOOM = 1.4;
 const CAMERA_PADDING = 520;
-const MIN_FOCUS_WIDTH = 1320;
-const MIN_FOCUS_HEIGHT = 860;
+const MIN_FOCUS_WIDTH = 980;
+const MIN_FOCUS_HEIGHT = 640;
+const AGENT_COLORS = ["#f7b267", "#70c1b3", "#b388eb", "#f25f5c", "#9bc53d"];
 
 interface CameraApi {
   focus: () => void;
@@ -62,6 +63,25 @@ export default function PhaserGame(props: Props) {
 
     const personaSprites: Record<string, Phaser.Types.Physics.Arcade.SpriteWithDynamicBody> = {};
     const personaLabels: Record<string, Phaser.GameObjects.Text> = {};
+    const personaMarkers: Record<string, Phaser.GameObjects.Ellipse> = {};
+
+    const getInitials = (name: string) => {
+      const rgx = /(\p{L}{1})\p{L}+/gu;
+      const initials = [...name.matchAll(rgx)];
+      return ((initials.shift()?.[1] || "") + (initials.pop()?.[1] || "")).toUpperCase();
+    };
+
+    const syncPersonaOverlay = (name: string) => {
+      const sprite = personaSprites[name];
+      const label = personaLabels[name];
+      const marker = personaMarkers[name];
+      if (!sprite || !label || !marker) return;
+
+      label.x = sprite.body.x - 6;
+      label.y = sprite.body.y - 74;
+      marker.x = sprite.body.x + TILE / 2;
+      marker.y = sprite.body.y + TILE - 8;
+    };
 
     const clampZoom = (zoom: number) =>
       Phaser.Math.Clamp(zoom, CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM);
@@ -215,19 +235,24 @@ export default function PhaserGame(props: Props) {
 
       (this as any)._cursors = cursors;
 
-      for (const name of Object.keys(personaInitPos)) {
+      for (const [index, name] of Object.keys(personaInitPos).entries()) {
         const pos = personaInitPos[name];
         const sx = pos[0] * TILE + TILE / 2;
         const sy = pos[1] * TILE + TILE;
+        const markerColor = Phaser.Display.Color.HexStringToColor(AGENT_COLORS[index % AGENT_COLORS.length]).color;
+        personaMarkers[name] = this.add.ellipse(sx, sy - 8, 34, 18, markerColor, 0.78)
+          .setStrokeStyle(4, 0xffffff, 0.95)
+          .setDepth(2.8);
         const sprite = this.physics.add.sprite(sx, sy, "atlas", "misa-front")
-          .setSize(30, 40).setOffset(0, 32);
+          .setSize(30, 40).setOffset(0, 32).setScale(1.28).setDepth(3);
         personaSprites[name] = sprite;
         personaLabels[name] = this.add.text(sx - 6, sy - 74, "", {
-          font: "28px monospace",
-          color: "#000000",
-          padding: { x: 8, y: 8 },
-          backgroundColor: "#ffffff",
-        }).setDepth(3);
+          font: "32px monospace",
+          color: "#101712",
+          padding: { x: 10, y: 8 },
+          backgroundColor: "rgba(255,255,255,0.96)",
+        }).setDepth(4).setShadow(0, 2, "#ffffff", 2, true, true);
+        personaLabels[name].setText(getInitials(name));
       }
 
       const anims = this.anims;
@@ -300,9 +325,7 @@ export default function PhaserGame(props: Props) {
             const pd = executeMovement.persona[name] ?? executeMovement.persona[name.replace(/_/g, " ")];
             if (!pd) continue;
             movementTarget[name] = [pd.movement[0] * TILE, pd.movement[1] * TILE];
-            const rgx = /(\p{L}{1})\p{L}+/gu;
-            const initials = [...name.matchAll(rgx)];
-            const ini = ((initials.shift()?.[1] || "") + (initials.pop()?.[1] || "")).toUpperCase();
+            const ini = getInitials(name);
             personaLabels[name].setText(ini + ": " + (pd.pronunciatio || ""));
             onPersonaUpdate?.(name, pd);
           }
@@ -319,8 +342,7 @@ export default function PhaserGame(props: Props) {
             else if (s.body.y < tgt[1]) { s.body.y += moveSpeed; dir = "d"; }
             else if (s.body.y > tgt[1]) { s.body.y -= moveSpeed; dir = "u"; }
 
-            personaLabels[name].x = s.body.x - 6;
-            personaLabels[name].y = s.body.y - 74;
+            syncPersonaOverlay(name);
 
             if (dir) preDir[name] = dir;
             if (dir === "l") s.anims.play("misa-left-walk", true);
@@ -339,6 +361,7 @@ export default function PhaserGame(props: Props) {
             if (tgt) {
               personaSprites[name].body.x = tgt[0];
               personaSprites[name].body.y = tgt[1];
+              syncPersonaOverlay(name);
             }
           }
 
