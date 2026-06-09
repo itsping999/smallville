@@ -64,6 +64,7 @@ export default function PhaserGame(props: Props) {
     const personaSprites: Record<string, Phaser.Types.Physics.Arcade.SpriteWithDynamicBody> = {};
     const personaLabels: Record<string, Phaser.GameObjects.Text> = {};
     const personaMarkers: Record<string, Phaser.GameObjects.Ellipse> = {};
+    const personaSleeping: Record<string, boolean> = {};
 
     const getInitials = (name: string) => {
       const rgx = /(\p{L}{1})\p{L}+/gu;
@@ -77,10 +78,38 @@ export default function PhaserGame(props: Props) {
       const marker = personaMarkers[name];
       if (!sprite || !label || !marker) return;
 
-      label.x = sprite.body.x - 6;
-      label.y = sprite.body.y - 74;
-      marker.x = sprite.body.x + TILE / 2;
-      marker.y = sprite.body.y + TILE - 8;
+      if (personaSleeping[name]) {
+        label.x = sprite.body.x - 4;
+        label.y = sprite.body.y - 46;
+        marker.x = sprite.body.x + TILE / 2;
+        marker.y = sprite.body.y + TILE / 2;
+      } else {
+        label.x = sprite.body.x - 6;
+        label.y = sprite.body.y - 74;
+        marker.x = sprite.body.x + TILE / 2;
+        marker.y = sprite.body.y + TILE - 8;
+      }
+    };
+
+    const applyPersonaPose = (name: string, data: any) => {
+      const sprite = personaSprites[name];
+      const marker = personaMarkers[name];
+      if (!sprite || !marker) return;
+
+      const description = String(data?.description || "").toLowerCase();
+      const sleepingOnBed = description.includes("sleeping") && description.includes(":bed");
+      personaSleeping[name] = sleepingOnBed;
+
+      if (sleepingOnBed) {
+        sprite.anims.stop();
+        sprite.setVisible(false);
+        marker.setDisplaySize(58, 24).setAlpha(0.9).setDepth(3.2);
+      } else {
+        sprite.setVisible(true).setAngle(0).setScale(1.28).setDepth(3);
+        marker.setDisplaySize(34, 18).setAlpha(0.78).setDepth(2.8);
+      }
+
+      syncPersonaOverlay(name);
     };
 
     const clampZoom = (zoom: number) =>
@@ -327,6 +356,7 @@ export default function PhaserGame(props: Props) {
             movementTarget[name] = [pd.movement[0] * TILE, pd.movement[1] * TILE];
             const ini = getInitials(name);
             personaLabels[name].setText(ini + ": " + (pd.pronunciatio || ""));
+            applyPersonaPose(name, pd);
             onPersonaUpdate?.(name, pd);
           }
         }
@@ -343,6 +373,11 @@ export default function PhaserGame(props: Props) {
             else if (s.body.y > tgt[1]) { s.body.y -= moveSpeed; dir = "u"; }
 
             syncPersonaOverlay(name);
+
+            if (personaSleeping[name]) {
+              s.anims.stop();
+              continue;
+            }
 
             if (dir) preDir[name] = dir;
             if (dir === "l") s.anims.play("misa-left-walk", true);
