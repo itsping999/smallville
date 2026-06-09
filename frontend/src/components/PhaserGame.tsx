@@ -47,10 +47,13 @@ export default function PhaserGame(props: Props) {
     } = props;
 
     let step = props.step;
-    let phase: "process" | "update" | "execute" = mode === "simulate" ? "update" : "execute";
+    let phase: "process" | "update" | "execute" | "idle" = mode === "simulate" ? "update" : "execute";
     let timer = 0;
     const timerMax = mode === "simulate" ? 12 : 0;
     let executeMovement: any = allMovement ? allMovement[String(props.step)] : null;
+    const demoSteps = allMovement
+      ? Object.keys(allMovement).map(Number).filter(Number.isFinite).sort((a, b) => a - b)
+      : [];
     const moveSpeed = mode === "demo" ? playSpeed : SPEED;
     let executeCountMax = TILE / moveSpeed;
     let executeCount = executeCountMax;
@@ -287,14 +290,14 @@ export default function PhaserGame(props: Props) {
           timer = timerMax;
         }
         timer--;
-      } else {
+      } else if (phase === "execute") {
         if (executeMovement?.meta?.curr_time) {
           onTimeUpdate?.(executeMovement.meta.curr_time);
         }
 
         if (executeCount === executeCountMax && executeMovement?.persona) {
           for (const name of names) {
-            const pd = executeMovement.persona[name];
+            const pd = executeMovement.persona[name] ?? executeMovement.persona[name.replace(/_/g, " ")];
             if (!pd) continue;
             movementTarget[name] = [pd.movement[0] * TILE, pd.movement[1] * TILE];
             const rgx = /(\p{L}{1})\p{L}+/gu;
@@ -338,19 +341,22 @@ export default function PhaserGame(props: Props) {
               personaSprites[name].body.y = tgt[1];
             }
           }
-          step++;
-          onStepChange?.(step);
 
           if (mode === "demo") {
-            const nextMovement = allMovement?.[String(step)];
-            if (nextMovement) {
+            const nextStep = demoSteps.find((candidate) => candidate > step);
+            const nextMovement = nextStep === undefined ? null : allMovement?.[String(nextStep)];
+            if (nextStep !== undefined && nextMovement) {
+              step = nextStep;
+              onStepChange?.(step);
               executeMovement = nextMovement;
               executeCount = executeCountMax;
             } else {
-              phase = "execute";
+              phase = "idle";
               executeCount = 0;
             }
           } else {
+            step++;
+            onStepChange?.(step);
             phase = "process";
             executeCount = executeCountMax + 1;
           }

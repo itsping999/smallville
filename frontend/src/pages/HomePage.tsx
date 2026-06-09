@@ -9,6 +9,21 @@ interface PersonaState {
   chat: [string, string][] | null;
 }
 
+function personaKey(name: string) {
+  return name.replace(/\s+/g, "_");
+}
+
+function summarizeState(state?: PersonaState) {
+  const [rawAction = "", ...locationParts] = (state?.description || "").split("@");
+  const action = rawAction.trim() || "Waiting for the next live update";
+  const location = locationParts.join("@").trim() || "Location not reported yet";
+  const chatText = state?.chat?.length
+    ? state.chat.map(([who, msg]) => `${who}: ${msg}`).join("\n")
+    : "No active conversation";
+
+  return { action, location, chatText };
+}
+
 export default function HomePage() {
   const [sim, setSim] = useState<SimStatus | null>(null);
   const [time, setTime] = useState("");
@@ -65,56 +80,142 @@ export default function HomePage() {
 
   const initPos: Record<string, [number, number]> = {};
   for (const p of sim.persona_init_pos) {
-    initPos[p.name.replace(" ", "_")] = [p.x, p.y];
+    initPos[personaKey(p.name)] = [p.x, p.y];
   }
+  const displayTime = time || "Waiting for first step...";
+  const latestStates = sim.persona_names.map((p) => ({
+    ...p,
+    state: personaStates[p.underscore] ?? personaStates[p.original],
+    avatar: `/static/assets/characters/profile/${p.underscore}.png`,
+  }));
 
   return (
-    <div className="page">
-      <PhaserGame
-        mode="simulate"
-        simCode={sim.sim_code}
-        step={sim.step}
-        personaInitPos={initPos}
-        onTimeUpdate={onTimeUpdate}
-        onPersonaUpdate={onPersonaUpdate}
-        sendEnvironment={doSendEnv}
-        fetchMovement={doFetchMovement}
-      />
-
-      <div className="info-panel">
-        <div className="time-display">
-          <h3>Current Time</h3>
-          <h2>{time || "Waiting for first step..."}</h2>
+    <div className="page workspace-page">
+      <header className="workspace-header">
+        <div className="workspace-title">
+          <span className="mode-pill live">Live simulation</span>
+          <h1>Smallville Observation Desk</h1>
+          <p>{sim.sim_code.replace(/_/g, " ")}</p>
         </div>
+        <div className="workspace-stats" aria-label="Simulation status">
+          <div>
+            <span>Agents</span>
+            <strong>{sim.persona_names.length}</strong>
+          </div>
+          <div>
+            <span>Step</span>
+            <strong>{sim.step}</strong>
+          </div>
+          <div>
+            <span>Status</span>
+            <strong>Live</strong>
+          </div>
+        </div>
+      </header>
 
-        {sim.persona_names.map((p) => {
-          const st = personaStates[p.original];
-          const action = st?.description?.split("@")[0] || "";
-          const location = st?.description?.split("@")[1] || "";
-          const chatText = st?.chat
-            ? st.chat.map(([who, msg]) => `${who}: ${msg}`).join("\n")
-            : "None at the moment";
-
-          return (
-            <div key={p.underscore} className="persona-card">
-              <div className="persona-avatar">
-                <img src="/static/img/atlas.png" alt={p.original} />
-              </div>
-              <div className="persona-info">
-                <h2>
-                  {p.original}{" "}
-                  <a href="#" className="state-link" onClick={(e) => { e.preventDefault(); setSelectedPersona(p.underscore); }}>
-                    State Details
-                  </a>
-                </h2>
-                <p><strong>Current Action:</strong><br />{action}</p>
-                <p><strong>Location:</strong><br />{location}</p>
-                <p><strong>Conversation:</strong><br />{chatText}</p>
-              </div>
+      <main className="workspace-grid">
+        <section className="map-window" aria-label="Town map">
+          <div className="map-window-header">
+            <div>
+              <span className="section-kicker">Town map</span>
+              <h2>{displayTime}</h2>
             </div>
-          );
-        })}
-      </div>
+            <span className="window-status live">Live handoff</span>
+          </div>
+          <PhaserGame
+            mode="simulate"
+            simCode={sim.sim_code}
+            step={sim.step}
+            personaInitPos={initPos}
+            onTimeUpdate={onTimeUpdate}
+            onPersonaUpdate={onPersonaUpdate}
+            sendEnvironment={doSendEnv}
+            fetchMovement={doFetchMovement}
+          />
+        </section>
+
+        <aside className="info-panel" aria-label="Simulation details">
+          <section className="side-section">
+            <span className="section-kicker">Current time</span>
+            <h2>{displayTime}</h2>
+            <div className="time-meta">
+              <span>Simulation {sim.sim_code}</span>
+              <span>Step {sim.step}</span>
+            </div>
+          </section>
+
+          <section className="side-section">
+            <div className="section-heading">
+              <span className="section-kicker">Roster</span>
+              <span>{sim.persona_names.length} active</span>
+            </div>
+            <div className="persona-grid">
+              {latestStates.map((p) => (
+                <button
+                  key={p.underscore}
+                  type="button"
+                  className="persona-chip"
+                  onClick={() => setSelectedPersona(p.underscore)}
+                  aria-label={`${p.original} state details`}
+                >
+                  <img
+                    src={p.avatar}
+                    alt={p.original}
+                    onError={(e) => { (e.target as HTMLImageElement).src = "/static/img/atlas.png"; }}
+                  />
+                  <span>{p.initial}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="side-section activity-section">
+            <div className="section-heading">
+              <span className="section-kicker">Agent activity</span>
+              <span>Live</span>
+            </div>
+
+            <div className="persona-list">
+              {latestStates.map((p) => {
+                const summary = summarizeState(p.state);
+
+                return (
+                  <article key={p.underscore} className="persona-card">
+                    <div className="persona-card-header">
+                      <img
+                        src={p.avatar}
+                        alt={p.original}
+                        onError={(e) => { (e.target as HTMLImageElement).src = "/static/img/atlas.png"; }}
+                      />
+                      <div>
+                        <h3>{p.original}</h3>
+                        <span>{p.initial}</span>
+                      </div>
+                      <button type="button" className="state-link" onClick={() => setSelectedPersona(p.underscore)}>
+                        State
+                      </button>
+                    </div>
+                    <dl className="persona-facts">
+                      <div>
+                        <dt>Action</dt>
+                        <dd>{summary.action}</dd>
+                      </div>
+                      <div>
+                        <dt>Location</dt>
+                        <dd>{summary.location}</dd>
+                      </div>
+                      <div>
+                        <dt>Conversation</dt>
+                        <dd>{summary.chatText}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        </aside>
+      </main>
 
       {selectedPersona && sim && (
         <PersonaStatePage

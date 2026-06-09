@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PhaserGame from "../components/PhaserGame";
 import PersonaStatePage from "./PersonaStatePage";
 import type { DemoData } from "../api";
@@ -6,6 +6,61 @@ import { fetchDemoData } from "../api";
 
 interface Props { simCode: string; step: number; }
 interface PersonaState { description: string; chat: [string, string][] | null; }
+
+function personaKey(name: string) {
+  return name.replace(/\s+/g, "_");
+}
+
+function formatReplayTime(demo: DemoData, movementStep: number) {
+  const current = new Date(demo.start_datetime);
+  current.setSeconds(current.getSeconds() + (movementStep - demo.step) * demo.sec_per_step);
+  return current.toLocaleString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function normalizeMovement(demo: DemoData) {
+  const movement: Record<string, any> = {};
+
+  for (const [rawStep, rawFrame] of Object.entries(demo.all_movement)) {
+    const frame = rawFrame as any;
+    const rawPersona = frame?.persona && typeof frame.persona === "object" ? frame.persona : frame;
+    const persona: Record<string, any> = {};
+
+    for (const [name, data] of Object.entries(rawPersona || {})) {
+      persona[personaKey(name)] = data;
+    }
+
+    const movementStep = Number(rawStep);
+    movement[String(rawStep)] = {
+      ...(frame?.persona ? frame : {}),
+      persona,
+      meta: {
+        ...(frame?.meta || {}),
+        curr_time: frame?.meta?.curr_time || formatReplayTime(demo, movementStep),
+      },
+    };
+  }
+
+  return movement;
+}
+
+function summarizeState(state?: PersonaState) {
+  const [rawAction = "", ...locationParts] = (state?.description || "").split("@");
+  const action = rawAction.trim() || "Waiting for the next recorded action";
+  const location = locationParts.join("@").trim() || "Location not reported yet";
+  const chatText = state?.chat?.length
+    ? state.chat.map(([who, msg]) => `${who}: ${msg}`).join("\n")
+    : "No active conversation";
+
+  return { action, location, chatText };
+}
 
 export default function DemoPage({ simCode, step }: Props) {
   const [demo, setDemo] = useState<DemoData | null>(null);
@@ -27,6 +82,7 @@ export default function DemoPage({ simCode, step }: Props) {
     }));
   }, []);
   const onStepChange = useCallback((s: number) => setCurrentStep(s), []);
+  const movement = useMemo(() => (demo ? normalizeMovement(demo) : {}), [demo]);
 
   if (error) {
     return (
@@ -39,86 +95,146 @@ export default function DemoPage({ simCode, step }: Props) {
 
   if (!demo) return <div className="loading">Loading demo...</div>;
 
-  const movement: Record<string, any> = {};
-  for (const [k, v] of Object.entries(demo.all_movement)) {
-    movement[String(k)] = v;
-  }
-
   const startDate = new Date(demo.start_datetime);
   const dateStr = startDate.toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
   const timeStr = startDate.toLocaleTimeString("en-US");
+  const displayTime = time || `${dateStr} ${timeStr}`;
+  const latestStates = demo.persona_names.map((p) => ({
+    ...p,
+    state: personaStates[p.underscore] ?? personaStates[p.original],
+    avatar: `/static/assets/characters/profile/${p.underscore}.png`,
+  }));
 
   return (
-    <div className="page">
-      <div className="demo-banner">
-        <em>Pre-computed replay — "Generative Agents: Interactive Simulacra of Human Behavior"</em>
-      </div>
-
-      <PhaserGame
-        mode="demo"
-        simCode={demo.sim_code}
-        step={demo.step}
-        personaInitPos={demo.persona_init_pos}
-        allMovement={movement}
-        playSpeed={demo.play_speed}
-        onTimeUpdate={onTimeUpdate}
-        onPersonaUpdate={onPersonaUpdate}
-        onStepChange={onStepChange}
-      />
-
-      <div className="info-panel">
-        <div className="time-display">
-          <h3>Current Time</h3>
-          <h2>{time || `${dateStr} ${timeStr}`}</h2>
+    <div className="page workspace-page">
+      <header className="workspace-header">
+        <div className="workspace-title">
+          <span className="mode-pill">Replay demo</span>
+          <h1>Smallville Observation Desk</h1>
+          <p>Generative Agents replay / {demo.sim_code.replace(/_/g, " ")}</p>
         </div>
-
-        <div className="persona-grid">
-          {demo.persona_names.map((p) => (
-            <div key={p.underscore} className="persona-chip">
-              <img
-                src={`/static/assets/characters/profile/${p.underscore}.png`}
-                alt={p.original}
-                onError={(e) => { (e.target as HTMLImageElement).src = "/static/img/atlas.png"; }}
-              />
-              <span className="initial">{p.initial}</span>
-            </div>
-          ))}
+        <div className="workspace-stats" aria-label="Replay status">
+          <div>
+            <span>Agents</span>
+            <strong>{demo.persona_names.length}</strong>
+          </div>
+          <div>
+            <span>Step</span>
+            <strong>{currentStep}</strong>
+          </div>
+          <div>
+            <span>Tick</span>
+            <strong>{demo.sec_per_step}s</strong>
+          </div>
         </div>
+      </header>
 
-        {demo.persona_names.map((p) => {
-          const st = personaStates[p.original];
-          const action = st?.description?.split("@")[0] || "";
-          const location = st?.description?.split("@")[1] || "";
-          const chatText = st?.chat
-            ? st.chat.map(([who, msg]) => `${who}: ${msg}`).join("\n")
-            : "None at the moment";
-
-          return (
-            <div key={p.underscore} className="persona-card">
-              <div className="persona-avatar">
-                <img
-                  src={`/static/assets/characters/profile/${p.underscore}.png`}
-                  alt={p.original}
-                  onError={(e) => { (e.target as HTMLImageElement).src = "/static/img/atlas.png"; }}
-                />
-              </div>
-              <div className="persona-info">
-                <h2>
-                  {p.original}{" "}
-                  <a href="#" className="state-link" onClick={(e) => { e.preventDefault(); setSelectedPersona(p.underscore); }}>
-                    State Details
-                  </a>
-                </h2>
-                <p><strong>Current Action:</strong><br />{action}</p>
-                <p><strong>Location:</strong><br />{location}</p>
-                <p><strong>Conversation:</strong><br />{chatText}</p>
-              </div>
+      <main className="workspace-grid">
+        <section className="map-window" aria-label="Town map">
+          <div className="map-window-header">
+            <div>
+              <span className="section-kicker">Town map</span>
+              <h2>{displayTime}</h2>
             </div>
-          );
-        })}
-      </div>
+            <span className="window-status">Pre-computed replay</span>
+          </div>
+          <PhaserGame
+            mode="demo"
+            simCode={demo.sim_code}
+            step={demo.step}
+            personaInitPos={demo.persona_init_pos}
+            allMovement={movement}
+            playSpeed={demo.play_speed}
+            onTimeUpdate={onTimeUpdate}
+            onPersonaUpdate={onPersonaUpdate}
+            onStepChange={onStepChange}
+          />
+        </section>
+
+        <aside className="info-panel" aria-label="Simulation details">
+          <section className="side-section">
+            <span className="section-kicker">Current time</span>
+            <h2>{displayTime}</h2>
+            <div className="time-meta">
+              <span>Started {dateStr}</span>
+              <span>Replay speed x{demo.play_speed}</span>
+            </div>
+          </section>
+
+          <section className="side-section">
+            <div className="section-heading">
+              <span className="section-kicker">Roster</span>
+              <span>{demo.persona_names.length} active</span>
+            </div>
+            <div className="persona-grid">
+              {latestStates.map((p) => (
+                <button
+                  key={p.underscore}
+                  type="button"
+                  className="persona-chip"
+                  onClick={() => setSelectedPersona(p.underscore)}
+                  aria-label={`${p.original} state details`}
+                >
+                  <img
+                    src={p.avatar}
+                    alt={p.original}
+                    onError={(e) => { (e.target as HTMLImageElement).src = "/static/img/atlas.png"; }}
+                  />
+                  <span>{p.initial}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="side-section activity-section">
+            <div className="section-heading">
+              <span className="section-kicker">Agent activity</span>
+              <span>Step {currentStep}</span>
+            </div>
+
+            <div className="persona-list">
+              {latestStates.map((p) => {
+                const summary = summarizeState(p.state);
+
+                return (
+                  <article key={p.underscore} className="persona-card">
+                    <div className="persona-card-header">
+                      <img
+                        src={p.avatar}
+                        alt={p.original}
+                        onError={(e) => { (e.target as HTMLImageElement).src = "/static/img/atlas.png"; }}
+                      />
+                      <div>
+                        <h3>{p.original}</h3>
+                        <span>{p.initial}</span>
+                      </div>
+                      <button type="button" className="state-link" onClick={() => setSelectedPersona(p.underscore)}>
+                        State
+                      </button>
+                    </div>
+                    <dl className="persona-facts">
+                      <div>
+                        <dt>Action</dt>
+                        <dd>{summary.action}</dd>
+                      </div>
+                      <div>
+                        <dt>Location</dt>
+                        <dd>{summary.location}</dd>
+                      </div>
+                      <div>
+                        <dt>Conversation</dt>
+                        <dd>{summary.chatText}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        </aside>
+      </main>
 
       {selectedPersona && (
         <PersonaStatePage
