@@ -82,7 +82,7 @@ select {
 
 .workspace-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(92px, 1fr));
+  grid-template-columns: repeat(4, minmax(86px, 1fr));
   gap: 8px;
   min-width: min(420px, 100%);
 }
@@ -149,6 +149,96 @@ select {
   line-height: 1.3;
 }
 
+.replay-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.icon-control {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #bdd0e2;
+  border-radius: 6px;
+  background: #eef5fb;
+  color: #1d3b58;
+  cursor: pointer;
+}
+
+.icon-control:hover {
+  background: #dbeaf6;
+}
+
+.play-icon {
+  width: 0;
+  height: 0;
+  margin-left: 3px;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 11px solid currentColor;
+}
+
+.pause-icon {
+  width: 14px;
+  height: 15px;
+  border-right: 4px solid currentColor;
+  border-left: 4px solid currentColor;
+}
+
+.replay-progress {
+  display: grid;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid #263a2e;
+  background: #17241b;
+}
+
+.progress-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: #d9e7dc;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.timeline-track,
+.step-track {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #314034;
+}
+
+.timeline-track {
+  height: 8px;
+}
+
+.step-track {
+  height: 3px;
+  background: #253347;
+}
+
+.timeline-track span,
+.step-track span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  transition: width 140ms ease-out;
+}
+
+.timeline-track span {
+  background: #f1b84b;
+}
+
+.step-track span {
+  background: #7aa4c7;
+}
+
 .map-stage {
   width: 100%;
   height: clamp(520px, calc(100vh - 214px), 760px);
@@ -185,6 +275,7 @@ select {
 }
 
 .map-toolbar button:focus-visible,
+.icon-control:focus-visible,
 .persona-chip:focus-visible,
 .state-link:focus-visible,
 .primary-link:focus-visible,
@@ -492,12 +583,17 @@ select {
   }
 
   .workspace-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .map-window-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .replay-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .map-stage {

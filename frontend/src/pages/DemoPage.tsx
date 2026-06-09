@@ -6,6 +6,15 @@ import { fetchDemoData } from "../api";
 
 interface Props { simCode: string; step: number; }
 interface PersonaState { description: string; chat: [string, string][] | null; }
+interface ReplayStats {
+  firstStep: number;
+  lastStep: number;
+  currentFrame: number;
+  totalFrames: number;
+  nextStep: number | null;
+  percent: number;
+  stepPercent: number;
+}
 
 function personaKey(name: string) {
   return name.replace(/\s+/g, "_");
@@ -62,19 +71,52 @@ function summarizeState(state?: PersonaState) {
   return { action, location, chatText };
 }
 
+function getReplayStats(movementSteps: number[], currentStep: number, fallbackStep: number): ReplayStats {
+  const totalFrames = movementSteps.length;
+  const firstStep = movementSteps[0] ?? fallbackStep;
+  const lastStep = movementSteps[totalFrames - 1] ?? firstStep;
+  const exactIndex = movementSteps.indexOf(currentStep);
+  const nextIndex = movementSteps.findIndex((candidate) => candidate > currentStep);
+  const currentIndex = exactIndex >= 0
+    ? exactIndex
+    : nextIndex === -1
+      ? Math.max(0, totalFrames - 1)
+      : Math.max(0, nextIndex - 1);
+  const percent = totalFrames > 1 ? (currentIndex / (totalFrames - 1)) * 100 : 0;
+  const stepPercent = lastStep > firstStep
+    ? ((currentStep - firstStep) / (lastStep - firstStep)) * 100
+    : 0;
+
+  return {
+    firstStep,
+    lastStep,
+    currentFrame: totalFrames ? currentIndex + 1 : 0,
+    totalFrames,
+    nextStep: nextIndex === -1 ? null : movementSteps[nextIndex],
+    percent: Math.min(100, Math.max(0, percent)),
+    stepPercent: Math.min(100, Math.max(0, stepPercent)),
+  };
+}
+
 export default function DemoPage({ simCode, step }: Props) {
   const [demo, setDemo] = useState<DemoData | null>(null);
-  const [time, setTime] = useState("");
   const [personaStates, setPersonaStates] = useState<Record<string, PersonaState>>({});
   const [error, setError] = useState("");
   const [selectedPersona, setSelectedPersona] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(step);
+  const [isPlaying, setIsPlaying] = useState(true);
 
   useEffect(() => {
     fetchDemoData(simCode, step).then(setDemo).catch((e) => setError(e.message));
   }, [simCode, step]);
 
-  const onTimeUpdate = useCallback((t: string) => setTime(t), []);
+  useEffect(() => {
+    setCurrentStep(step);
+    setPersonaStates({});
+    setSelectedPersona(null);
+    setIsPlaying(true);
+  }, [simCode, step]);
+
   const onPersonaUpdate = useCallback((name: string, data: any) => {
     setPersonaStates((prev) => ({
       ...prev,
@@ -83,6 +125,15 @@ export default function DemoPage({ simCode, step }: Props) {
   }, []);
   const onStepChange = useCallback((s: number) => setCurrentStep(s), []);
   const movement = useMemo(() => (demo ? normalizeMovement(demo) : {}), [demo]);
+  const movementSteps = useMemo(() => (
+    demo
+      ? Object.keys(demo.all_movement).map(Number).filter(Number.isFinite).sort((a, b) => a - b)
+      : []
+  ), [demo]);
+  const replayStats = useMemo(
+    () => getReplayStats(movementSteps, currentStep, step),
+    [movementSteps, currentStep, step],
+  );
 
   if (error) {
     return (
@@ -99,8 +150,7 @@ export default function DemoPage({ simCode, step }: Props) {
   const dateStr = startDate.toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
-  const timeStr = startDate.toLocaleTimeString("en-US");
-  const displayTime = time || `${dateStr} ${timeStr}`;
+  const displayTime = formatReplayTime(demo, currentStep);
   const latestStates = demo.persona_names.map((p) => ({
     ...p,
     state: personaStates[p.underscore] ?? personaStates[p.original],
@@ -125,6 +175,10 @@ export default function DemoPage({ simCode, step }: Props) {
             <strong>{currentStep}</strong>
           </div>
           <div>
+            <span>Frame</span>
+            <strong>{replayStats.currentFrame}/{replayStats.totalFrames}</strong>
+          </div>
+          <div>
             <span>Tick</span>
             <strong>{demo.sec_per_step}s</strong>
           </div>
@@ -138,7 +192,33 @@ export default function DemoPage({ simCode, step }: Props) {
               <span className="section-kicker">Town map</span>
               <h2>{displayTime}</h2>
             </div>
-            <span className="window-status">Pre-computed replay</span>
+            <div className="replay-actions">
+              <button
+                type="button"
+                className="icon-control"
+                onClick={() => setIsPlaying((value) => !value)}
+                aria-label={isPlaying ? "Pause replay" : "Play replay"}
+                title={isPlaying ? "Pause replay" : "Play replay"}
+              >
+                <span className={isPlaying ? "pause-icon" : "play-icon"} aria-hidden="true" />
+              </button>
+              <span className={isPlaying ? "window-status live" : "window-status"}>
+                {isPlaying ? "Playing" : "Paused"}
+              </span>
+            </div>
+          </div>
+          <div className="replay-progress" aria-label="Replay progress">
+            <div className="progress-copy">
+              <span>Recorded frame {replayStats.currentFrame} / {replayStats.totalFrames}</span>
+              <span>Step range {replayStats.firstStep} - {replayStats.lastStep}</span>
+              <span>{replayStats.nextStep ? `Next recorded step ${replayStats.nextStep}` : "Replay complete"}</span>
+            </div>
+            <div className="timeline-track" aria-hidden="true">
+              <span style={{ width: `${replayStats.percent}%` }} />
+            </div>
+            <div className="step-track" aria-hidden="true">
+              <span style={{ width: `${replayStats.stepPercent}%` }} />
+            </div>
           </div>
           <PhaserGame
             mode="demo"
@@ -147,7 +227,7 @@ export default function DemoPage({ simCode, step }: Props) {
             personaInitPos={demo.persona_init_pos}
             allMovement={movement}
             playSpeed={demo.play_speed}
-            onTimeUpdate={onTimeUpdate}
+            isPlaying={isPlaying}
             onPersonaUpdate={onPersonaUpdate}
             onStepChange={onStepChange}
           />

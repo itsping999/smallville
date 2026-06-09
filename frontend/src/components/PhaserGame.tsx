@@ -9,6 +9,7 @@ interface Props {
   personaInitPos: Record<string, [number, number]>;
   allMovement?: Record<string, any>;
   playSpeed?: number;
+  isPlaying?: boolean;
   onTimeUpdate?: (time: string) => void;
   onPersonaUpdate?: (name: string, data: any) => void;
   onStepChange?: (step: number) => void;
@@ -36,6 +37,11 @@ export default function PhaserGame(props: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const cameraApiRef = useRef<CameraApi | null>(null);
+  const playbackRef = useRef({ isPlaying: props.isPlaying ?? true });
+
+  useEffect(() => {
+    playbackRef.current.isPlaying = props.isPlaying ?? true;
+  }, [props.isPlaying]);
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
@@ -375,6 +381,8 @@ export default function PhaserGame(props: Props) {
       if (cursors.right.isDown) cam.scrollX += camSpeed;
       if (cursors.up.isDown) cam.scrollY -= camSpeed;
       if (cursors.down.isDown) cam.scrollY += camSpeed;
+
+      if (mode === "demo" && !playbackRef.current.isPlaying) return;
 
       const names = Object.keys(personaSprites);
 
