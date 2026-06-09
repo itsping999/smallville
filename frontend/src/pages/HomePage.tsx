@@ -32,6 +32,7 @@ export default function HomePage() {
   const [demos, setDemos] = useState<DemoSummary[]>([]);
   const [selectedPersona, setSelectedPersona] = useState<string | null>(null);
   const [waitingStep, setWaitingStep] = useState<number | null>(null);
+  const [liveStep, setLiveStep] = useState<number | null>(null);
 
   useEffect(() => {
     fetchSimStatus()
@@ -43,6 +44,7 @@ export default function HomePage() {
   }, []);
 
   const onTimeUpdate = useCallback((t: string) => setTime(t), []);
+  const onLiveStepChange = useCallback((step: number) => setLiveStep(step), []);
   const onPersonaUpdate = useCallback((name: string, data: any) => {
     setWaitingStep(null);
     setPersonaStates((prev) => ({
@@ -80,6 +82,7 @@ export default function HomePage() {
 
   if (!sim) return <div className="loading">Loading simulation...</div>;
 
+  const displayStep = liveStep ?? sim.step;
   const initPos: Record<string, [number, number]> = {};
   for (const p of sim.persona_init_pos) {
     initPos[personaKey(p.name)] = [p.x, p.y];
@@ -108,7 +111,7 @@ export default function HomePage() {
           </div>
           <div>
             <span>Step</span>
-            <strong>{sim.step}</strong>
+            <strong>{displayStep}</strong>
           </div>
           <div>
             <span>Status</span>
@@ -135,6 +138,7 @@ export default function HomePage() {
             personaInitPos={initPos}
             onTimeUpdate={onTimeUpdate}
             onPersonaUpdate={onPersonaUpdate}
+            onStepChange={onLiveStepChange}
             onWaitingForMovement={setWaitingStep}
             sendEnvironment={doSendEnv}
             fetchMovement={doFetchMovement}
@@ -147,7 +151,7 @@ export default function HomePage() {
             <h2>{displayTime}</h2>
             <div className="time-meta">
               <span>Simulation {sim.sim_code}</span>
-              <span>Step {sim.step}</span>
+              <span>Step {displayStep}</span>
               {waitingStep && <span>Waiting for movement/{waitingStep}.json</span>}
             </div>
           </section>
@@ -228,7 +232,7 @@ export default function HomePage() {
       {selectedPersona && sim && (
         <PersonaStatePage
           simCode={sim.sim_code}
-          step={sim.step}
+          step={displayStep}
           personaName={selectedPersona}
           onClose={() => setSelectedPersona(null)}
         />
