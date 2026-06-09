@@ -31,6 +31,7 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [demos, setDemos] = useState<DemoSummary[]>([]);
   const [selectedPersona, setSelectedPersona] = useState<string | null>(null);
+  const [waitingStep, setWaitingStep] = useState<number | null>(null);
 
   useEffect(() => {
     fetchSimStatus()
@@ -43,6 +44,7 @@ export default function HomePage() {
 
   const onTimeUpdate = useCallback((t: string) => setTime(t), []);
   const onPersonaUpdate = useCallback((name: string, data: any) => {
+    setWaitingStep(null);
     setPersonaStates((prev) => ({
       ...prev,
       [name]: { description: data.description || "", chat: data.chat || null },
@@ -83,6 +85,8 @@ export default function HomePage() {
     initPos[personaKey(p.name)] = [p.x, p.y];
   }
   const displayTime = time || "Waiting for first step...";
+  const liveStatus = waitingStep ? `Waiting for step ${waitingStep}` : "Live";
+  const handoffStatus = waitingStep ? "Waiting for Reverie" : "Live handoff";
   const latestStates = sim.persona_names.map((p) => ({
     ...p,
     state: personaStates[p.underscore] ?? personaStates[p.original],
@@ -108,7 +112,7 @@ export default function HomePage() {
           </div>
           <div>
             <span>Status</span>
-            <strong>Live</strong>
+            <strong>{liveStatus}</strong>
           </div>
         </div>
       </header>
@@ -120,7 +124,9 @@ export default function HomePage() {
               <span className="section-kicker">Town map</span>
               <h2>{displayTime}</h2>
             </div>
-            <span className="window-status live">Live handoff</span>
+            <span className={waitingStep ? "window-status waiting" : "window-status live"}>
+              {handoffStatus}
+            </span>
           </div>
           <PhaserGame
             mode="simulate"
@@ -129,6 +135,7 @@ export default function HomePage() {
             personaInitPos={initPos}
             onTimeUpdate={onTimeUpdate}
             onPersonaUpdate={onPersonaUpdate}
+            onWaitingForMovement={setWaitingStep}
             sendEnvironment={doSendEnv}
             fetchMovement={doFetchMovement}
           />
@@ -141,6 +148,7 @@ export default function HomePage() {
             <div className="time-meta">
               <span>Simulation {sim.sim_code}</span>
               <span>Step {sim.step}</span>
+              {waitingStep && <span>Waiting for movement/{waitingStep}.json</span>}
             </div>
           </section>
 

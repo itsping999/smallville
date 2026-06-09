@@ -80,6 +80,12 @@ select {
   color: #34506b;
 }
 
+.window-status.waiting {
+  border-color: #e6d29c;
+  background: #fff7df;
+  color: #735515;
+}
+
 .workspace-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(86px, 1fr));

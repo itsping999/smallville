@@ -55,7 +55,8 @@ class ReverieServer:
     # reverie/meta/json's fork variable. 
     self.sim_code = sim_code
     sim_folder = f"{fs_storage}/{self.sim_code}"
-    copyanything(fork_folder, sim_folder)
+    if os.path.abspath(fork_folder) != os.path.abspath(sim_folder):
+      copyanything(fork_folder, sim_folder)
 
     with open(f"{sim_folder}/reverie/meta.json") as json_file:  
       reverie_meta = json.load(json_file)
@@ -613,7 +614,6 @@ if __name__ == '__main__':
 
   rs = ReverieServer(origin, target)
   rs.open_server()
-
 
 
 

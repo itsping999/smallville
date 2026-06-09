@@ -13,6 +13,7 @@ interface Props {
   onTimeUpdate?: (time: string) => void;
   onPersonaUpdate?: (name: string, data: any) => void;
   onStepChange?: (step: number) => void;
+  onWaitingForMovement?: (step: number) => void;
   sendEnvironment?: (step: number, env: Record<string, { maze: string; x: number; y: number }>) => Promise<void>;
   fetchMovement?: (step: number) => Promise<MovementData>;
 }
@@ -49,7 +50,7 @@ export default function PhaserGame(props: Props) {
     const {
       mode, personaInitPos,
       allMovement, playSpeed = 2,
-      onTimeUpdate, onPersonaUpdate, onStepChange,
+      onTimeUpdate, onPersonaUpdate, onStepChange, onWaitingForMovement,
       sendEnvironment, fetchMovement,
     } = props;
 
@@ -323,6 +324,8 @@ export default function PhaserGame(props: Props) {
               executeMovement = data;
               executeCount = executeCountMax;
               phase = "execute";
+            } else {
+              onWaitingForMovement?.(step);
             }
           });
           timer = timerMax;

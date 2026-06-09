@@ -80,6 +80,58 @@ def environment_files_desc(sim_code: str, base: Path | None = None) -> list[Path
     return [env_dir / f"{step}.json" for step in sorted(steps, reverse=True)]
 
 
+def numbered_json_steps(path: Path) -> list[int]:
+    if not path.exists():
+        return []
+
+    steps: list[int] = []
+    for candidate in path.iterdir():
+        if candidate.suffix != ".json" or candidate.name.startswith("."):
+            continue
+        try:
+            steps.append(int(candidate.stem))
+        except ValueError:
+            continue
+    return sorted(steps)
+
+
+def latest_live_step(sim_code: str, cfg: Settings = settings) -> int | None:
+    sim_code = ensure_safe_segment(sim_code, "sim_code")
+    movement_steps = numbered_json_steps(cfg.storage_dir / sim_code / "movement")
+    if movement_steps:
+        return movement_steps[-1]
+
+    env_steps = numbered_json_steps(cfg.storage_dir / sim_code / "environment")
+    if env_steps:
+        return env_steps[-1]
+
+    return None
+
+
+def normalize_persona_key(name: str) -> str:
+    return name.replace("_", " ")
+
+
+def expand_environment_names(
+    sim_code: str,
+    environment: dict[str, Any],
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Accept frontend underscore keys while preserving Reverie's display names."""
+    persona_names, _ = find_persona_names(sim_code, cfg.storage_dir)
+    display_by_key = {
+        persona.underscore: persona.original
+        for persona in persona_names
+    }
+    display_by_key.update({persona.original: persona.original for persona in persona_names})
+
+    normalized: dict[str, Any] = {}
+    for key, value in environment.items():
+        display_key = display_by_key.get(key, normalize_persona_key(key))
+        normalized[display_key] = value
+    return normalized
+
+
 def list_compressed_demos(cfg: Settings = settings) -> list[dict[str, Any]]:
     if not cfg.compressed_storage_dir.exists():
         return []
@@ -110,13 +162,30 @@ def load_current_status(cfg: Settings = settings) -> dict[str, Any]:
 
     sim_code = read_json(sim_file)["sim_code"]
     step = read_json(step_file)["step"]
+    latest_step = latest_live_step(sim_code, cfg)
+    if latest_step is not None:
+        step = latest_step
+
     persona_names, persona_set = find_persona_names(sim_code, cfg.storage_dir)
     persona_init_pos: list[dict[str, Any]] = []
+    movement_file = cfg.storage_dir / sim_code / "movement" / f"{step}.json"
+    if movement_file.exists():
+        movement_data = read_json(movement_file)
+        for key, val in (movement_data.get("persona") or {}).items():
+            display_key = normalize_persona_key(key)
+            if display_key in persona_set:
+                persona_init_pos.append(
+                    {"name": display_key, "x": val["movement"][0], "y": val["movement"][1]}
+                )
+
     for env_file in environment_files_desc(sim_code, cfg.storage_dir):
+        if persona_init_pos:
+            break
         env_data = read_json(env_file)
         for key, val in env_data.items():
-            if key in persona_set:
-                persona_init_pos.append({"name": key, "x": val["x"], "y": val["y"]})
+            display_key = normalize_persona_key(key)
+            if display_key in persona_set:
+                persona_init_pos.append({"name": display_key, "x": val["x"], "y": val["y"]})
         if persona_init_pos:
             break
 

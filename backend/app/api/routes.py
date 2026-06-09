@@ -13,6 +13,7 @@ from backend.app.api.schemas import (
 from backend.app.config import settings
 from backend.app.services.storage import (
     ensure_safe_segment,
+    expand_environment_names,
     list_compressed_demos,
     load_current_status,
     load_demo_data,
@@ -52,6 +53,13 @@ def simulation_status() -> dict[str, object]:
     return load_current_status()
 
 
+@router.get("/reverie/status")
+def reverie_status() -> dict[str, object]:
+    from backend.app.main import runner
+
+    return runner.status()
+
+
 @router.get("/demo/{sim_code}/{step}")
 def demo_data(sim_code: str, step: int, play_speed: str = "2") -> dict[str, object]:
     if step < 0:
@@ -70,7 +78,11 @@ def persona_state(sim_code: str, step: int, persona_name: str) -> dict[str, obje
 def process_environment(payload: EnvironmentProcessRequest) -> dict[str, str]:
     sim_code = ensure_safe_segment(payload.sim_code, "sim_code")
     env_dir = settings.storage_dir / sim_code / "environment"
-    write_json(env_dir / f"{payload.step}.json", jsonable_encoder(payload.environment))
+    environment = expand_environment_names(
+        sim_code,
+        jsonable_encoder(payload.environment),
+    )
+    write_json(env_dir / f"{payload.step}.json", environment)
     return {"status": "ok"}
 
 

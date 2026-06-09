@@ -1,6 +1,8 @@
 """Smallville FastAPI application."""
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -8,6 +10,20 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.routes import router
 from backend.app.config import settings
+from backend.app.services.reverie_runner import LiveReverieRunner
+
+
+runner = LiveReverieRunner(settings)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    runner.start()
+    app.state.reverie_runner = runner
+    try:
+        yield
+    finally:
+        runner.stop()
 
 
 def create_app() -> FastAPI:
@@ -15,6 +31,7 @@ def create_app() -> FastAPI:
         title="Smallville",
         description="FastAPI backend for the Smallville generative agents demo.",
         version="1.0.0",
+        lifespan=lifespan,
     )
     app.add_middleware(
         CORSMiddleware,

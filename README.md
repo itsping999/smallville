@@ -108,26 +108,30 @@ Open `http://127.0.0.1:5173`. Vite proxies `/api` and `/static` to FastAPI.
 
 ## Run A Live Reverie Simulation
 
-Live simulation still uses the original interactive Reverie CLI. Start the FastAPI backend first, then run:
+FastAPI can start and drive the Reverie engine in the same process. Start the backend:
+
+```bash
+uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Then open `http://127.0.0.1:5173/` or `http://127.0.0.1:8000/`. By default the live runner forks:
+
+```dotenv
+REVERIE_AUTO_START=1
+REVERIE_FORK_SIM_CODE=base_the_ville_isabella_maria_klaus
+REVERIE_LIVE_SIM_CODE=codex-live
+```
+
+Set `REVERIE_AUTO_START=0` when you only want the bundled replay demo and do not want live LLM calls.
+
+You can still use the original interactive Reverie CLI manually:
 
 ```bash
 cd reverie/backend_server
 python reverie.py
 ```
 
-At the prompts, use a base simulation such as:
-
-```text
-base_the_ville_isabella_maria_klaus
-```
-
-Then choose a new simulation code, open `http://127.0.0.1:5173/` or `http://127.0.0.1:8000/`, and drive simulation steps from the CLI:
-
-```text
-run 10
-```
-
-Use `fin` to save or `exit` to quit without saving.
+At the prompts, use a base simulation such as `base_the_ville_isabella_maria_klaus`, then choose a new simulation code and drive steps with commands like `run 10`. Use `fin` to save or `exit` to quit without saving.
 
 ## API
 

@@ -41,6 +41,11 @@ class Settings:
     llm_disable_embeddings: bool = _bool_env(os.getenv("LLM_DISABLE_EMBEDDINGS"), False)
     llm_api_key_configured: bool = bool(os.getenv("LLM_API_KEY"))
     debug: bool = _bool_env(os.getenv("DEBUG"), False)
+    reverie_auto_start: bool = _bool_env(os.getenv("REVERIE_AUTO_START"), True)
+    reverie_fork_sim_code: str = os.getenv(
+        "REVERIE_FORK_SIM_CODE", "base_the_ville_isabella_maria_klaus"
+    )
+    reverie_live_sim_code: str = os.getenv("REVERIE_LIVE_SIM_CODE", "codex-live")
 
 
 settings = Settings()
