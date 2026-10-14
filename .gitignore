@@ -27,6 +27,8 @@ data/storage/*
 !data/storage/base_the_ville_isabella_maria_klaus/**
 !data/storage/base_the_ville_n25/
 !data/storage/base_the_ville_n25/**
+!data/storage/base_the_ville_expanded/
+!data/storage/base_the_ville_expanded/**
 
 # Local databases and logs
 *.sqlite3
