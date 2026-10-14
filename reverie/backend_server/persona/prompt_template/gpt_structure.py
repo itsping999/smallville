@@ -65,8 +65,9 @@ def _chat_completion(prompt, model=None, temperature=None,
                      max_tokens=None, top_p=None, stop=None):
     model = _require_provider_config(model or CHAT_MODEL, "chat completion")
     system_msg = (
-        "You are a text-completion engine. The user message is a partial text. "
-        "Continue it naturally with ONLY the next few words. Do NOT repeat, explain, or add anything extra."
+        "You are a helpful text-completion and reasoning engine. "
+        "Continue the given prompt naturally, strictly following the formatting, structure, and constraints demonstrated in the prompt examples. "
+        "Do NOT add conversational filler, meta-commentary, or preamble."
     )
     kwargs = {
         "model": model,
@@ -254,9 +255,14 @@ def generate_prompt(curr_input, prompt_lib_file):
         curr_input = [curr_input]
     curr_input = [str(i) for i in curr_input]
 
-    f = open(prompt_lib_file, "r")
-    prompt = f.read()
-    f.close()
+    if not os.path.exists(prompt_lib_file):
+        server_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        candidate = os.path.join(server_root, prompt_lib_file)
+        if os.path.exists(candidate):
+            prompt_lib_file = candidate
+
+    with open(prompt_lib_file, "r") as f:
+        prompt = f.read()
     for count, i in enumerate(curr_input):
         prompt = prompt.replace(f"!<INPUT {count}>!", i)
     if "<commentblockmarker>###</commentblockmarker>" in prompt:
@@ -276,8 +282,11 @@ def safe_generate_response(prompt,
 
     for i in range(repeat):
         curr_gpt_response = GPT_request(prompt, gpt_parameter)
-        if func_validate(curr_gpt_response, prompt=prompt):
-            return func_clean_up(curr_gpt_response, prompt=prompt)
+        try:
+            if func_validate and func_validate(curr_gpt_response, prompt=prompt):
+                return func_clean_up(curr_gpt_response, prompt=prompt)
+        except Exception:
+            pass
         if verbose:
             print("---- repeat count: ", i, curr_gpt_response)
             print(curr_gpt_response)

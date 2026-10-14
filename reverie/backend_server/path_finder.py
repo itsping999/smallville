@@ -6,6 +6,7 @@ Description: Implements various path finding functions for generative agents.
 Some of the functions are defunct. 
 """
 import numpy as np
+from collections import deque
 
 def print_maze(maze):
   for row in maze:
@@ -94,71 +95,61 @@ def path_finder_v1(maze, start, end, collision_block_char, verbose=False):
 
 
 def path_finder_v2(a, start, end, collision_block_char, verbose=False):
-  def make_step(m, k):
-    for i in range(len(m)):
-      for j in range(len(m[i])):
-        if m[i][j] == k:
-          if i>0 and m[i-1][j] == 0 and a[i-1][j] == 0:
-            m[i-1][j] = k + 1
-          if j>0 and m[i][j-1] == 0 and a[i][j-1] == 0:
-            m[i][j-1] = k + 1
-          if i<len(m)-1 and m[i+1][j] == 0 and a[i+1][j] == 0:
-            m[i+1][j] = k + 1
-          if j<len(m[i])-1 and m[i][j+1] == 0 and a[i][j+1] == 0:
-             m[i][j+1] = k + 1
+  """
+  Optimized Breadth-First Search (BFS) path finder.
+  Functionally identical to original path_finder_v2 with 150-step horizon,
+  but runs in O(V + E) rather than O(K * V) grid rescans.
+  """
+  if not a or not a[0]:
+    return [end]
 
-  new_maze = []
-  for row in a: 
-    new_row = []
-    for j in row:
-      if j == collision_block_char: 
-        new_row += [1]
-      else: 
-        new_row += [0]
-    new_maze += [new_row]
-  a = new_maze
+  num_rows = len(a)
+  num_cols = len(a[0])
 
-  m = []
-  for i in range(len(a)):
-      m.append([])
-      for j in range(len(a[i])):
-          m[-1].append(0)
-  i,j = start
-  m[i][j] = 1 
+  start_r, start_c = start
+  end_r, end_c = end
 
-  k = 0
-  except_handle = 150
-  while m[end[0]][end[1]] == 0:
-      k += 1
-      make_step(m, k)
+  if (start_r, start_c) == (end_r, end_c):
+    return [(start_r, start_c)]
 
-      if except_handle == 0: 
-        break
-      except_handle -= 1 
+  if not (0 <= end_r < num_rows and 0 <= end_c < num_cols):
+    return [end]
+  if a[end_r][end_c] == collision_block_char:
+    return [end]
 
-  i, j = end
-  k = m[i][j]
-  the_path = [(i,j)]
-  while k > 1:
-    if i > 0 and m[i - 1][j] == k-1:
-      i, j = i-1, j
-      the_path.append((i, j))
-      k-=1
-    elif j > 0 and m[i][j - 1] == k-1:
-      i, j = i, j-1
-      the_path.append((i, j))
-      k-=1
-    elif i < len(m) - 1 and m[i + 1][j] == k-1:
-      i, j = i+1, j
-      the_path.append((i, j))
-      k-=1
-    elif j < len(m[i]) - 1 and m[i][j + 1] == k-1:
-      i, j = i, j+1
-      the_path.append((i, j))
-      k -= 1
-        
-  the_path.reverse()
-  return the_path
+  queue = deque([(start_r, start_c, 0)])
+  parent = {}
+  visited = {(start_r, start_c)}
+  max_dist = 150
+  found = False
+
+  while queue:
+    curr_r, curr_c, dist = queue.popleft()
+    if (curr_r, curr_c) == (end_r, end_c):
+      found = True
+      break
+    if dist >= max_dist:
+      continue
+
+    # Up, Left, Down, Right
+    for dr, dc in ((-1, 0), (0, -1), (1, 0), (0, 1)):
+      nr, nc = curr_r + dr, curr_c + dc
+      if 0 <= nr < num_rows and 0 <= nc < num_cols:
+        if (nr, nc) not in visited and a[nr][nc] != collision_block_char:
+          visited.add((nr, nc))
+          parent[(nr, nc)] = (curr_r, curr_c)
+          queue.append((nr, nc, dist + 1))
+
+  if not found:
+    return [end]
+
+  path = []
+  curr = (end_r, end_c)
+  while curr:
+    path.append(curr)
+    curr = parent.get(curr)
+  path.reverse()
+  return path
 
 
 def path_finder(maze, start, end, collision_block_char, verbose=False):

@@ -13,7 +13,8 @@ from persona.prompt_template.gpt_structure import *
 from persona.prompt_template.run_gpt_prompt import *
 
 def generate_poig_score(persona, event_type, description): 
-  if "is idle" in description: 
+  desc_lower = (description or "").lower()
+  if any(w in desc_lower for w in ["is idle", "sleeping", "is sleep", "being used", "bed is"]): 
     return 1
 
   if event_type == "event": 

@@ -86,8 +86,11 @@ class AssociativeMemory:
       o = node_details["object"]
 
       description = node_details["description"]
-      embedding_pair = (node_details["embedding_key"], 
-                        self.embeddings[node_details["embedding_key"]])
+      emb_key = node_details["embedding_key"]
+      if emb_key not in self.embeddings:
+        from persona.prompt_template.gpt_structure import get_embedding
+        self.embeddings[emb_key] = get_embedding(emb_key)
+      embedding_pair = (emb_key, self.embeddings[emb_key])
       poignancy =node_details["poignancy"]
       keywords = set(node_details["keywords"])
       filling = node_details["filling"]

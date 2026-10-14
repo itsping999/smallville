@@ -372,8 +372,10 @@ def run_gpt_prompt_task_decomp(persona,
         _cr += [i]
     for count, i in enumerate(_cr): 
       k = [j.strip() for j in i.split("(duration in minutes:")]
+      if len(k) < 2:
+        raise ValueError(f"Missing duration format in: {i}")
       task = k[0]
-      if task[-1] == ".": 
+      if task and task[-1] == ".": 
         task = task[:-1]
       duration = int(k[1].split(",")[0].strip())
       cr += [[task, duration]]
@@ -395,11 +397,11 @@ def run_gpt_prompt_task_decomp(persona,
     curr_min_slot = curr_min_slot[1:]   
 
     if len(curr_min_slot) > total_expected_min: 
-      last_task = curr_min_slot[60]
+      last_task = curr_min_slot[60] if len(curr_min_slot) > 60 else curr_min_slot[-1]
       for i in range(1, 6): 
         curr_min_slot[-1 * i] = last_task
     elif len(curr_min_slot) < total_expected_min: 
-      last_task = curr_min_slot[-1]
+      last_task = curr_min_slot[-1] if curr_min_slot else (task, 0)
       for i in range(total_expected_min - len(curr_min_slot)):
         curr_min_slot += [last_task]
 
@@ -414,17 +416,13 @@ def run_gpt_prompt_task_decomp(persona,
     return cr
 
   def __func_validate(gpt_response, prompt=""): 
-    # TODO -- this sometimes generates error 
     try: 
-      __func_clean_up(gpt_response)
+      return bool(__func_clean_up(gpt_response, prompt=prompt))
     except: 
-      pass
-      # return False
-    return gpt_response
+      return False
 
   def get_fail_safe(): 
-    fs = ["asleep"]
-    return fs
+    return [[task, duration]]
 
   gpt_param = {"engine": "text-davinci-003", "max_tokens": 1000, 
              "temperature": 0, "top_p": 1, "stream": False,
