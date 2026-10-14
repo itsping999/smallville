@@ -1,12 +1,26 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import PhaserGame from "../components/PhaserGame";
 import PersonaStatePage from "./PersonaStatePage";
 import type { SimStatus, MovementData, DemoSummary } from "../api";
-import { fetchSimStatus, sendEnvironment, fetchMovement, fetchDemos } from "../api";
+import { fetchSimStatus, sendEnvironment, fetchMovement, fetchDemos, stopSimulation } from "../api";
 
 interface PersonaState {
   description: string;
   chat: [string, string][] | null;
+}
+
+interface RosterPersona {
+  original: string;
+  underscore: string;
+  initial: string;
+  state?: PersonaState;
+  avatar: string;
+}
+
+interface HoverTarget {
+  persona: RosterPersona;
+  top: number;
+  centerX: number;
 }
 
 function personaKey(name: string) {
@@ -31,10 +45,27 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [demos, setDemos] = useState<DemoSummary[]>([]);
   const [selectedPersona, setSelectedPersona] = useState<string | null>(null);
+  const [hoverTarget, setHoverTarget] = useState<HoverTarget | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
   const [waitingStep, setWaitingStep] = useState<number | null>(null);
   const [liveStep, setLiveStep] = useState<number | null>(null);
+  const [isStopping, setIsStopping] = useState(false);
+  const [isStopped, setIsStopped] = useState(false);
+
+  const handleStopLive = async () => {
+    try {
+      setIsStopping(true);
+      await stopSimulation();
+      setIsStopped(true);
+    } catch (e: any) {
+      alert(`停止模拟失败: ${e.message}`);
+    } finally {
+      setIsStopping(false);
+    }
+  };
 
   useEffect(() => {
+    document.title = "Smallville · Live Simulation";
     fetchSimStatus()
       .then(setSim)
       .catch((e) => {
@@ -68,13 +99,18 @@ export default function HomePage() {
     const demo = demos[0];
     return (
       <div className="error-page">
-        <h2>No live simulation is running</h2>
-        <p>For a live run, start the Reverie CLI with <code>cd reverie/backend_server && python reverie.py</code>.</p>
-        {demo && (
-          <a className="primary-link" href={`/demo/${demo.sim_code}/${demo.default_step}`}>
-            Open bundled demo
+        <h2>未检测到正在运行的实时模拟</h2>
+        <p>当前没有在运行中的实时仿真线程。您可以在存档中心选择一个世界模板进行实时计算，或体验离线演示。</p>
+        <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "16px" }}>
+          <a className="primary-link" href="/">
+            ← 返回存档中心
           </a>
-        )}
+          {demo && (
+            <a className="primary-link" href={`/demo/${demo.sim_code}/${demo.default_step}`}>
+              🎬 体验离线演示
+            </a>
+          )}
+        </div>
         <p className="error-detail">{error}</p>
       </div>
     );
@@ -88,8 +124,8 @@ export default function HomePage() {
     initPos[personaKey(p.name)] = [p.x, p.y];
   }
   const displayTime = time || "Waiting for first step...";
-  const liveStatus = waitingStep ? `Waiting for step ${waitingStep}` : "Live";
-  const handoffStatus = waitingStep ? "Waiting for Reverie" : "Live handoff";
+  const liveStatus = isStopped ? "Stopped" : waitingStep ? `Waiting for step ${waitingStep}` : "Live";
+  const handoffStatus = isStopped ? "Stopped" : waitingStep ? "Waiting for Reverie" : "Live handoff";
   const latestStates = sim.persona_names.map((p) => ({
     ...p,
     state: personaStates[p.underscore] ?? personaStates[p.original],
@@ -97,40 +133,51 @@ export default function HomePage() {
   }));
 
   return (
-    <div className="page workspace-page">
+    <div className="page workspace-page compact-viewport">
       <header className="workspace-header">
-        <div className="workspace-title">
+        <div className="workspace-header-left">
+          <a href="/" className="back-link">
+            ← Back to saves
+          </a>
           <span className="mode-pill live">Live simulation</span>
-          <h1>Smallville Observation Desk</h1>
-          <p>{sim.sim_code.replace(/_/g, " ")}</p>
+          <h1>Smallville</h1>
+          <span className="header-sub-tag">{sim.sim_code.replace(/_/g, " ")}</span>
         </div>
-        <div className="workspace-stats" aria-label="Simulation status">
-          <div>
-            <span>Agents</span>
-            <strong>{sim.persona_names.length}</strong>
+
+        <div className="workspace-header-center">
+          <span className={isStopped ? "window-status waiting" : waitingStep ? "window-status waiting" : "window-status live"}>
+            {liveStatus}
+          </span>
+          <div className="header-time-pill" title="Live world time">
+            <span className="time-clock-icon">🕒</span>
+            <span className="time-value">{displayTime}</span>
           </div>
-          <div>
-            <span>Step</span>
-            <strong>{displayStep}</strong>
-          </div>
-          <div>
-            <span>Status</span>
-            <strong>{liveStatus}</strong>
-          </div>
+        </div>
+
+        <div className="workspace-header-right">
+          <span className="stat-pill stat-pill--villagers">
+            <strong>{sim.persona_names.length}</strong> Villagers
+          </span>
+          <span className="stat-pill stat-pill--step">
+            Step <strong>{displayStep}</strong>
+          </span>
+          <span className="stat-pill stat-pill--handoff">
+            Handoff <strong>{handoffStatus}</strong>
+          </span>
+          <button
+            type="button"
+            className="btn-stop-live-header"
+            onClick={handleStopLive}
+            disabled={isStopping || isStopped}
+            title="停止后台实时推演"
+          >
+            {isStopping ? "停止中..." : isStopped ? "已停止" : "⏹️ 停止模拟"}
+          </button>
         </div>
       </header>
 
-      <main className="workspace-grid">
-        <section className="map-window" aria-label="Town map">
-          <div className="map-window-header">
-            <div>
-              <span className="section-kicker">Town map</span>
-              <h2>{displayTime}</h2>
-            </div>
-            <span className={waitingStep ? "window-status waiting" : "window-status live"}>
-              {handoffStatus}
-            </span>
-          </div>
+      <main className="workspace-center-stage">
+        <section className="map-window-centered" aria-label="Town map">
           <PhaserGame
             mode="simulate"
             simCode={sim.sim_code}
@@ -144,90 +191,132 @@ export default function HomePage() {
             fetchMovement={doFetchMovement}
           />
         </section>
+      </main>
 
-        <aside className="info-panel" aria-label="Simulation details">
-          <section className="side-section">
-            <span className="section-kicker">Current time</span>
-            <h2>{displayTime}</h2>
-            <div className="time-meta">
-              <span>Simulation {sim.sim_code}</span>
-              <span>Step {displayStep}</span>
-              {waitingStep && <span>Waiting for movement/{waitingStep}.json</span>}
-            </div>
-          </section>
+      <footer className="roster-bottom-dock" aria-label="Town Villagers">
+        <div className="dock-title-tag">
+          <span className="dock-icon">👥</span>
+          <span className="dock-name">Villagers</span>
+          <span className="dock-badge">{latestStates.length}</span>
+        </div>
+        <div className="dock-roster-items">
+          {latestStates.map((p) => {
+            const summary = summarizeState(p.state);
+            const isHovered = hoverTarget?.persona.underscore === p.underscore;
 
-          <section className="side-section">
-            <div className="section-heading">
-              <span className="section-kicker">Roster</span>
-              <span>{sim.persona_names.length} active</span>
-            </div>
-            <div className="persona-grid">
-              {latestStates.map((p) => (
-                <button
-                  key={p.underscore}
-                  type="button"
-                  className="persona-chip"
-                  onClick={() => setSelectedPersona(p.underscore)}
-                  aria-label={`${p.original} state details`}
-                >
+            return (
+              <div
+                key={p.underscore}
+                className={`dock-persona-card ${isHovered ? "active" : ""}`}
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  if (hideTimerRef.current) {
+                    window.clearTimeout(hideTimerRef.current);
+                    hideTimerRef.current = null;
+                  }
+                  setHoverTarget({
+                    persona: p,
+                    top: rect.top,
+                    centerX: rect.left + rect.width / 2,
+                  });
+                }}
+                onMouseLeave={() => {
+                  hideTimerRef.current = window.setTimeout(() => {
+                    setHoverTarget(null);
+                  }, 120);
+                }}
+                onClick={() => setSelectedPersona(p.underscore)}
+                title="Hover for details, click for cognitive state"
+              >
+                <div className="dock-avatar-wrap">
                   <img
                     src={p.avatar}
                     alt={p.original}
-                    onError={(e) => { (e.target as HTMLImageElement).src = "/static/img/atlas.png"; }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/static/img/atlas.png";
+                    }}
                   />
-                  <span>{p.initial}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+                  <span className="dock-initials">{p.initial}</span>
+                </div>
+                <div className="dock-persona-info">
+                  <span className="dock-persona-name">{p.original}</span>
+                  <span className="dock-persona-location">
+                    {summary.location !== "Location not reported yet"
+                      ? `📍 ${summary.location}`
+                      : "📍 In town"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </footer>
 
-          <section className="side-section activity-section">
-            <div className="section-heading">
-              <span className="section-kicker">Agent activity</span>
-              <span>Live</span>
-            </div>
-
-            <div className="persona-list">
-              {latestStates.map((p) => {
-                const summary = summarizeState(p.state);
-
-                return (
-                  <article key={p.underscore} className="persona-card">
-                    <div className="persona-card-header">
-                      <img
-                        src={p.avatar}
-                        alt={p.original}
-                        onError={(e) => { (e.target as HTMLImageElement).src = "/static/img/atlas.png"; }}
-                      />
-                      <div>
-                        <h3>{p.original}</h3>
-                        <span>{p.initial}</span>
-                      </div>
-                      <button type="button" className="state-link" onClick={() => setSelectedPersona(p.underscore)}>
-                        State
-                      </button>
-                    </div>
-                    <dl className="persona-facts">
-                      <div>
-                        <dt>Action</dt>
-                        <dd>{summary.action}</dd>
-                      </div>
-                      <div>
-                        <dt>Location</dt>
-                        <dd>{summary.location}</dd>
-                      </div>
-                      <div>
-                        <dt>Conversation</dt>
-                        <dd>{summary.chatText}</dd>
-                      </div>
-                    </dl>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        </aside>
-      </main>
+      {hoverTarget && (
+        <div
+          className="roster-floating-card bottom-dock-mode"
+          style={{
+            position: "fixed",
+            bottom: window.innerHeight - hoverTarget.top + 10,
+            left: Math.max(16, Math.min(window.innerWidth - 376, hoverTarget.centerX - 180)),
+            zIndex: 9999,
+          }}
+          onMouseEnter={() => {
+            if (hideTimerRef.current) {
+              window.clearTimeout(hideTimerRef.current);
+              hideTimerRef.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            setHoverTarget(null);
+          }}
+        >
+          {(() => {
+            const summary = summarizeState(hoverTarget.persona.state);
+            return (
+              <>
+                <div className="popover-header">
+                  <img
+                    src={hoverTarget.persona.avatar}
+                    alt={hoverTarget.persona.original}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/static/img/atlas.png";
+                    }}
+                  />
+                  <div>
+                    <h4>{hoverTarget.persona.original}</h4>
+                    <span className="popover-badge">{hoverTarget.persona.initial}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="state-link"
+                    onClick={() => {
+                      setSelectedPersona(hoverTarget.persona.underscore);
+                      setHoverTarget(null);
+                    }}
+                  >
+                    State →
+                  </button>
+                </div>
+                <div className="popover-body">
+                  <div className="popover-field">
+                    <span className="field-label">Current Action</span>
+                    <p className="field-value action-value">{summary.action}</p>
+                  </div>
+                  <div className="popover-field">
+                    <span className="field-label">Location</span>
+                    <p className="field-value location-value">{summary.location}</p>
+                  </div>
+                  <div className="popover-field">
+                    <span className="field-label">Conversation</span>
+                    <p className="field-value chat-value">{summary.chatText}</p>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       {selectedPersona && sim && (
         <PersonaStatePage

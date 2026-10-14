@@ -10,4 +10,15 @@ export default defineConfig({
       "/static": "http://127.0.0.1:8000",
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          phaser: ["phaser"],
+          "react-vendor": ["react", "react-dom", "react-router-dom"],
+        },
+      },
+    },
+  },
 });

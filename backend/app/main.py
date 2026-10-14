@@ -18,7 +18,8 @@ runner = LiveReverieRunner(settings)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    runner.start()
+    if settings.reverie_auto_start:
+        runner.start()
     app.state.reverie_runner = runner
     try:
         yield

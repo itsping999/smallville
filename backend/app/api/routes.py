@@ -1,19 +1,23 @@
 """HTTP routes for simulation state, demos, and runtime configuration."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 
 from backend.app.api.schemas import (
     EnvironmentProcessRequest,
     EnvironmentUpdateRequest,
     PathTesterUpdateRequest,
+    SimulationStartRequest,
     SimulationStatus,
 )
 from backend.app.config import settings
+from backend.app.services.reverie_runner import LiveReverieRunner
 from backend.app.services.storage import (
+    delete_save,
     ensure_safe_segment,
     expand_environment_names,
+    list_all_saves,
     list_compressed_demos,
     load_current_status,
     load_demo_data,
@@ -24,6 +28,15 @@ from backend.app.services.storage import (
 
 
 router = APIRouter(prefix="/api")
+
+
+def _get_runner(request: Request) -> LiveReverieRunner:
+    runner = getattr(request.app.state, "reverie_runner", None)
+    if runner is not None:
+        return runner
+    from backend.app.main import runner as fallback_runner
+
+    return fallback_runner
 
 
 @router.get("/health")
@@ -48,16 +61,50 @@ def demos() -> dict[str, object]:
     return {"demos": list_compressed_demos()}
 
 
+@router.get("/saves")
+def get_saves() -> dict[str, object]:
+    return list_all_saves()
+
+
+@router.delete("/saves/{sim_code}")
+def delete_save_endpoint(sim_code: str, request: Request) -> dict[str, str]:
+    runner = _get_runner(request)
+    safe_code = ensure_safe_segment(sim_code, "sim_code")
+    if runner.is_running and runner.live_sim_code == safe_code:
+        raise HTTPException(status_code=400, detail="Cannot delete currently running simulation")
+    delete_save(safe_code)
+    return {"status": "ok", "deleted": safe_code}
+
+
+
 @router.get("/simulation/status", response_model=SimulationStatus)
 def simulation_status() -> dict[str, object]:
     return load_current_status()
 
 
 @router.get("/reverie/status")
-def reverie_status() -> dict[str, object]:
-    from backend.app.main import runner
+def reverie_status(request: Request) -> dict[str, object]:
+    return _get_runner(request).status()
 
-    return runner.status()
+
+@router.post("/simulation/start")
+def start_simulation(payload: SimulationStartRequest, request: Request) -> dict[str, object]:
+    runner = _get_runner(request)
+    fork_code = ensure_safe_segment(payload.fork_sim_code, "fork_sim_code")
+    if payload.sim_code:
+        live_code = ensure_safe_segment(payload.sim_code, "sim_code")
+    elif fork_code.startswith("base_"):
+        live_code = f"live-{fork_code.replace('base_', '')}"
+    else:
+        live_code = fork_code
+    runner.start(fork_sim_code=fork_code, sim_code=live_code, force=True)
+    return {"status": "ok", "sim_code": live_code, "fork_sim_code": fork_code}
+
+
+@router.post("/simulation/stop")
+def stop_simulation(request: Request) -> dict[str, object]:
+    _get_runner(request).stop()
+    return {"status": "ok"}
 
 
 @router.get("/demo/{sim_code}/{step}")

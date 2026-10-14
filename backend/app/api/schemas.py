@@ -44,3 +44,9 @@ class EnvironmentUpdateRequest(BaseModel):
 
 class PathTesterUpdateRequest(BaseModel):
     camera: dict[str, Any]
+
+
+class SimulationStartRequest(BaseModel):
+    fork_sim_code: str
+    sim_code: str | None = None
+

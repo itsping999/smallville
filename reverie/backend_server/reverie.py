@@ -28,8 +28,6 @@ import os
 import shutil
 import traceback
 
-from selenium import webdriver
-
 from global_methods import *
 from utils import *
 from maze import *
@@ -106,6 +104,7 @@ class ReverieServer:
     # The tile take the form of a set, (row, col). 
     # e.g., ["Isabella Rodriguez"] = (58, 39)
     self.personas_tile = dict()
+    self.stop_requested = False
     
     # # <persona_convo_match> is a dictionary that describes which of the two
     # # personas are talking to each other. It takes a key of a persona's full
@@ -305,8 +304,8 @@ class ReverieServer:
 
     # The main while loop of Reverie. 
     while (True): 
-      # Done with this iteration if <int_counter> reaches 0. 
-      if int_counter == 0: 
+      # Done with this iteration if <int_counter> reaches 0 or stop requested. 
+      if int_counter == 0 or getattr(self, "stop_requested", False): 
         break
 
       # <curr_env_file> file is the file that our frontend outputs. When the
@@ -372,6 +371,8 @@ class ReverieServer:
           movements = {"persona": dict(), 
                        "meta": dict()}
           for persona_name, persona in self.personas.items(): 
+            if getattr(self, "stop_requested", False):
+              break
             # <next_tile> is a x,y coordinate. e.g., (58, 9)
             # <pronunciatio> is an emoji. e.g., "\ud83d\udca4"
             # <description> is a string description of the movement. e.g., 
@@ -386,6 +387,9 @@ class ReverieServer:
             movements["persona"][persona_name]["description"] = description
             movements["persona"][persona_name]["chat"] = (persona
                                                           .scratch.chat)
+
+          if getattr(self, "stop_requested", False):
+            break
 
           # Include the meta information about the current stage in the 
           # movements dictionary. 
@@ -412,6 +416,8 @@ class ReverieServer:
 
           int_counter -= 1
           
+      if getattr(self, "stop_requested", False):
+        break
       # Sleep so we don't burn our machines. 
       time.sleep(self.server_sleep)
 

@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
-import PhaserGame from "../components/PhaserGame";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import PhaserGame, { type PhaserGameHandle } from "../components/PhaserGame";
 import PersonaStatePage from "./PersonaStatePage";
 import type { DemoData } from "../api";
-import { fetchDemoData } from "../api";
+import { fetchDemoData, startSimulation } from "../api";
 
 interface Props { simCode: string; step: number; }
 interface PersonaState { description: string; chat: [string, string][] | null; }
@@ -14,6 +14,18 @@ interface ReplayStats {
   nextStep: number | null;
   percent: number;
   stepPercent: number;
+}
+interface RosterPersona {
+  original: string;
+  underscore: string;
+  initial: string;
+  state?: PersonaState;
+  avatar: string;
+}
+interface HoverTarget {
+  persona: RosterPersona;
+  top: number;
+  centerX: number;
 }
 
 function personaKey(name: string) {
@@ -103,18 +115,49 @@ export default function DemoPage({ simCode, step }: Props) {
   const [personaStates, setPersonaStates] = useState<Record<string, PersonaState>>({});
   const [error, setError] = useState("");
   const [selectedPersona, setSelectedPersona] = useState<string | null>(null);
+  const [hoverTarget, setHoverTarget] = useState<HoverTarget | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
+  const phaserGameRef = useRef<PhaserGameHandle>(null);
   const [currentStep, setCurrentStep] = useState(step);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [playSpeed, setPlaySpeed] = useState<number>(2);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [isStartingLive, setIsStartingLive] = useState(false);
+  const wasPlayingRef = useRef(false);
+
+  const handleStartLiveFromDemo = async () => {
+    if (!demo) return;
+    try {
+      setIsStartingLive(true);
+      await startSimulation(demo.sim_code, demo.sim_code);
+      setTimeout(() => {
+        window.location.href = "/live";
+      }, 400);
+    } catch (e: any) {
+      alert(`启动实时模拟失败: ${e.message}`);
+      setIsStartingLive(false);
+    }
+  };
 
   useEffect(() => {
-    fetchDemoData(simCode, step).then(setDemo).catch((e) => setError(e.message));
+    fetchDemoData(simCode, step)
+      .then((data) => {
+        setDemo(data);
+        document.title = `Smallville · ${data.sim_code.replace(/_/g, " ")}`;
+        if (data.play_speed) {
+          setPlaySpeed(data.play_speed);
+        }
+      })
+      .catch((e) => setError(e.message));
   }, [simCode, step]);
 
   useEffect(() => {
     setCurrentStep(step);
     setPersonaStates({});
     setSelectedPersona(null);
+    setHoverTarget(null);
     setIsPlaying(true);
+    setIsScrubbing(false);
   }, [simCode, step]);
 
   const onPersonaUpdate = useCallback((name: string, data: any) => {
@@ -123,7 +166,16 @@ export default function DemoPage({ simCode, step }: Props) {
       [name]: { description: data.description || "", chat: data.chat || null },
     }));
   }, []);
-  const onStepChange = useCallback((s: number) => setCurrentStep(s), []);
+
+  const onStepChange = useCallback(
+    (s: number) => {
+      if (!isScrubbing) {
+        setCurrentStep(s);
+      }
+    },
+    [isScrubbing],
+  );
+
   const movement = useMemo(() => (demo ? normalizeMovement(demo) : {}), [demo]);
   const movementSteps = useMemo(() => (
     demo
@@ -134,6 +186,64 @@ export default function DemoPage({ simCode, step }: Props) {
     () => getReplayStats(movementSteps, currentStep, step),
     [movementSteps, currentStep, step],
   );
+
+  const seekToFrame = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= movementSteps.length) return;
+      const targetStep = movementSteps[index];
+      setCurrentStep(targetStep);
+      phaserGameRef.current?.seekTo(targetStep);
+    },
+    [movementSteps],
+  );
+
+  const handleScrubStart = useCallback(() => {
+    wasPlayingRef.current = isPlaying;
+    setIsPlaying(false);
+    setIsScrubbing(true);
+  }, [isPlaying]);
+
+  const handleScrubChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const index = Number(e.target.value);
+      seekToFrame(index);
+    },
+    [seekToFrame],
+  );
+
+  const handleScrubEnd = useCallback(() => {
+    setIsScrubbing((was) => {
+      if (was && wasPlayingRef.current) {
+        setIsPlaying(true);
+      }
+      return false;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isScrubbing) return;
+    const onGlobalRelease = () => {
+      handleScrubEnd();
+    };
+    window.addEventListener("pointerup", onGlobalRelease);
+    window.addEventListener("mouseup", onGlobalRelease);
+    window.addEventListener("touchend", onGlobalRelease);
+    return () => {
+      window.removeEventListener("pointerup", onGlobalRelease);
+      window.removeEventListener("mouseup", onGlobalRelease);
+      window.removeEventListener("touchend", onGlobalRelease);
+    };
+  }, [isScrubbing, handleScrubEnd]);
+
+  const togglePlay = useCallback(() => {
+    setIsPlaying((prev) => {
+      const nextPlaying = !prev;
+      if (nextPlaying && movementSteps.length > 0 && currentStep >= (movementSteps[movementSteps.length - 1] ?? currentStep)) {
+        seekToFrame(0);
+      }
+      return nextPlaying;
+    });
+  }, [currentStep, movementSteps, seekToFrame]);
 
   if (error) {
     return (
@@ -157,164 +267,243 @@ export default function DemoPage({ simCode, step }: Props) {
     avatar: `/static/assets/characters/profile/${p.underscore}.png`,
   }));
 
+  const currentFrameIndex = replayStats.currentFrame > 0 ? replayStats.currentFrame - 1 : 0;
+
   return (
-    <div className="page workspace-page">
+    <div className="page workspace-page compact-viewport">
       <header className="workspace-header">
-        <div className="workspace-title">
+        <div className="workspace-header-left">
+          <a href="/" className="back-link">
+            ← Back to saves
+          </a>
           <span className="mode-pill">Replay demo</span>
-          <h1>Smallville Observation Desk</h1>
-          <p>Generative Agents replay / {demo.sim_code.replace(/_/g, " ")}</p>
+          <h1>Smallville</h1>
+          <span className="header-sub-tag">{demo.sim_code.replace(/_/g, " ")}</span>
         </div>
-        <div className="workspace-stats" aria-label="Replay status">
-          <div>
-            <span>Agents</span>
-            <strong>{demo.persona_names.length}</strong>
+
+        <div className="workspace-header-center">
+          <button
+            type="button"
+            className="icon-control"
+            onClick={togglePlay}
+            aria-label={isPlaying ? "Pause replay" : "Play replay"}
+            title={isPlaying ? "Pause replay" : "Play replay"}
+          >
+            <span className={isPlaying ? "pause-icon" : "play-icon"} aria-hidden="true" />
+          </button>
+          <div className="header-time-pill" title={`Started ${dateStr} · Speed x${playSpeed}`}>
+            <span className="time-clock-icon">🕒</span>
+            <span className="time-value">{displayTime}</span>
           </div>
-          <div>
-            <span>Step</span>
-            <strong>{currentStep}</strong>
+          <div
+            className="header-progress-wrap"
+            title={`Recorded frame ${replayStats.currentFrame} / ${replayStats.totalFrames} · Step ${currentStep} (${replayStats.firstStep}-${replayStats.lastStep}) · Drag slider to scrub`}
+          >
+            <div className="header-slider-track-wrap">
+              <div className="header-progress-bar-bg" />
+              <div className="header-progress-bar-fill" style={{ width: `${replayStats.percent}%` }} />
+              <input
+                type="range"
+                className="header-progress-slider"
+                min={0}
+                max={Math.max(0, replayStats.totalFrames - 1)}
+                value={currentFrameIndex}
+                onPointerDown={handleScrubStart}
+                onMouseDown={handleScrubStart}
+                onTouchStart={handleScrubStart}
+                onChange={handleScrubChange}
+                onPointerUp={handleScrubEnd}
+                onMouseUp={handleScrubEnd}
+                onTouchEnd={handleScrubEnd}
+                aria-label="Replay progress scrubber"
+              />
+            </div>
+            <span className="header-progress-text">
+              {replayStats.currentFrame}/{replayStats.totalFrames}
+            </span>
           </div>
-          <div>
-            <span>Frame</span>
-            <strong>{replayStats.currentFrame}/{replayStats.totalFrames}</strong>
-          </div>
-          <div>
-            <span>Tick</span>
-            <strong>{demo.sec_per_step}s</strong>
+        </div>
+
+        <div className="workspace-header-right">
+          <button
+            type="button"
+            className="live-switch-pill"
+            onClick={handleStartLiveFromDemo}
+            disabled={isStartingLive}
+            title="以此演示存档启动实时计算仿真"
+          >
+            {isStartingLive ? "启动中..." : "⚡️ 转为实时模拟"}
+          </button>
+          <span className="stat-pill stat-pill--villagers">
+            <strong>{demo.persona_names.length}</strong> Villagers
+          </span>
+          <span className="stat-pill stat-pill--step">
+            Step <strong>{currentStep}</strong>
+          </span>
+          <div className="speed-control-pill" title="Playback speed">
+            <span className="speed-icon">⚡</span>
+            <span className="speed-label">Speed</span>
+            <select
+              className="speed-select"
+              value={playSpeed}
+              onChange={(e) => setPlaySpeed(Number(e.target.value))}
+              aria-label="Playback speed"
+            >
+              <option value={0.5}>0.5x</option>
+              <option value={1}>1.0x</option>
+              <option value={2}>2.0x</option>
+              <option value={4}>4.0x</option>
+              <option value={8}>8.0x</option>
+            </select>
           </div>
         </div>
       </header>
 
-      <main className="workspace-grid">
-        <section className="map-window" aria-label="Town map">
-          <div className="map-window-header">
-            <div>
-              <span className="section-kicker">Town map</span>
-              <h2>{displayTime}</h2>
-            </div>
-            <div className="replay-actions">
-              <button
-                type="button"
-                className="icon-control"
-                onClick={() => setIsPlaying((value) => !value)}
-                aria-label={isPlaying ? "Pause replay" : "Play replay"}
-                title={isPlaying ? "Pause replay" : "Play replay"}
-              >
-                <span className={isPlaying ? "pause-icon" : "play-icon"} aria-hidden="true" />
-              </button>
-              <span className={isPlaying ? "window-status live" : "window-status"}>
-                {isPlaying ? "Playing" : "Paused"}
-              </span>
-            </div>
-          </div>
-          <div className="replay-progress" aria-label="Replay progress">
-            <div className="progress-copy">
-              <span>Recorded frame {replayStats.currentFrame} / {replayStats.totalFrames}</span>
-              <span>Step range {replayStats.firstStep} - {replayStats.lastStep}</span>
-              <span>{replayStats.nextStep ? `Next recorded step ${replayStats.nextStep}` : "Replay complete"}</span>
-            </div>
-            <div className="timeline-track" aria-hidden="true">
-              <span style={{ width: `${replayStats.percent}%` }} />
-            </div>
-            <div className="step-track" aria-hidden="true">
-              <span style={{ width: `${replayStats.stepPercent}%` }} />
-            </div>
-          </div>
+      <main className="workspace-center-stage">
+        <section className="map-window-centered" aria-label="Town map">
           <PhaserGame
+            ref={phaserGameRef}
             mode="demo"
             simCode={demo.sim_code}
-            step={demo.step}
+            step={step}
             personaInitPos={demo.persona_init_pos}
             allMovement={movement}
-            playSpeed={demo.play_speed}
+            playSpeed={playSpeed}
             isPlaying={isPlaying}
             onPersonaUpdate={onPersonaUpdate}
             onStepChange={onStepChange}
           />
         </section>
+      </main>
 
-        <aside className="info-panel" aria-label="Simulation details">
-          <section className="side-section">
-            <span className="section-kicker">Current time</span>
-            <h2>{displayTime}</h2>
-            <div className="time-meta">
-              <span>Started {dateStr}</span>
-              <span>Replay speed x{demo.play_speed}</span>
-            </div>
-          </section>
+      <footer className="roster-bottom-dock" aria-label="Town Villagers">
+        <div className="dock-title-tag">
+          <span className="dock-icon">👥</span>
+          <span className="dock-name">Villagers</span>
+          <span className="dock-badge">{latestStates.length}</span>
+        </div>
+        <div className="dock-roster-items">
+          {latestStates.map((p) => {
+            const summary = summarizeState(p.state);
+            const isHovered = hoverTarget?.persona.underscore === p.underscore;
 
-          <section className="side-section">
-            <div className="section-heading">
-              <span className="section-kicker">Roster</span>
-              <span>{demo.persona_names.length} active</span>
-            </div>
-            <div className="persona-grid">
-              {latestStates.map((p) => (
-                <button
-                  key={p.underscore}
-                  type="button"
-                  className="persona-chip"
-                  onClick={() => setSelectedPersona(p.underscore)}
-                  aria-label={`${p.original} state details`}
-                >
+            return (
+              <div
+                key={p.underscore}
+                className={`dock-persona-card ${isHovered ? "active" : ""}`}
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  if (hideTimerRef.current) {
+                    window.clearTimeout(hideTimerRef.current);
+                    hideTimerRef.current = null;
+                  }
+                  setHoverTarget({
+                    persona: p,
+                    top: rect.top,
+                    centerX: rect.left + rect.width / 2,
+                  });
+                }}
+                onMouseLeave={() => {
+                  hideTimerRef.current = window.setTimeout(() => {
+                    setHoverTarget(null);
+                  }, 120);
+                }}
+                onClick={() => {
+                  setSelectedPersona(p.underscore);
+                  phaserGameRef.current?.focusPersona?.(p.underscore);
+                }}
+                title="Hover for details, click for cognitive state"
+              >
+                <div className="dock-avatar-wrap">
                   <img
                     src={p.avatar}
                     alt={p.original}
-                    onError={(e) => { (e.target as HTMLImageElement).src = "/static/img/atlas.png"; }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/static/img/atlas.png";
+                    }}
                   />
-                  <span>{p.initial}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+                  <span className="dock-initials">{p.initial}</span>
+                </div>
+                <div className="dock-persona-info">
+                  <span className="dock-persona-name">{p.original}</span>
+                  <span className="dock-persona-location">
+                    {summary.location !== "Location not reported yet"
+                      ? `📍 ${summary.location}`
+                      : "📍 In town"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </footer>
 
-          <section className="side-section activity-section">
-            <div className="section-heading">
-              <span className="section-kicker">Agent activity</span>
-              <span>Step {currentStep}</span>
-            </div>
-
-            <div className="persona-list">
-              {latestStates.map((p) => {
-                const summary = summarizeState(p.state);
-
-                return (
-                  <article key={p.underscore} className="persona-card">
-                    <div className="persona-card-header">
-                      <img
-                        src={p.avatar}
-                        alt={p.original}
-                        onError={(e) => { (e.target as HTMLImageElement).src = "/static/img/atlas.png"; }}
-                      />
-                      <div>
-                        <h3>{p.original}</h3>
-                        <span>{p.initial}</span>
-                      </div>
-                      <button type="button" className="state-link" onClick={() => setSelectedPersona(p.underscore)}>
-                        State
-                      </button>
-                    </div>
-                    <dl className="persona-facts">
-                      <div>
-                        <dt>Action</dt>
-                        <dd>{summary.action}</dd>
-                      </div>
-                      <div>
-                        <dt>Location</dt>
-                        <dd>{summary.location}</dd>
-                      </div>
-                      <div>
-                        <dt>Conversation</dt>
-                        <dd>{summary.chatText}</dd>
-                      </div>
-                    </dl>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        </aside>
-      </main>
+      {hoverTarget && (
+        <div
+          className="roster-floating-card bottom-dock-mode"
+          style={{
+            position: "fixed",
+            bottom: window.innerHeight - hoverTarget.top + 10,
+            left: Math.max(16, Math.min(window.innerWidth - 376, hoverTarget.centerX - 180)),
+            zIndex: 9999,
+          }}
+          onMouseEnter={() => {
+            if (hideTimerRef.current) {
+              window.clearTimeout(hideTimerRef.current);
+              hideTimerRef.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            setHoverTarget(null);
+          }}
+        >
+          {(() => {
+            const summary = summarizeState(hoverTarget.persona.state);
+            return (
+              <>
+                <div className="popover-header">
+                  <img
+                    src={hoverTarget.persona.avatar}
+                    alt={hoverTarget.persona.original}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/static/img/atlas.png";
+                    }}
+                  />
+                  <div>
+                    <h4>{hoverTarget.persona.original}</h4>
+                    <span className="popover-badge">{hoverTarget.persona.initial}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="state-link"
+                    onClick={() => {
+                      setSelectedPersona(hoverTarget.persona.underscore);
+                      phaserGameRef.current?.focusPersona?.(hoverTarget.persona.underscore);
+                      setHoverTarget(null);
+                    }}
+                  >
+                    State →
+                  </button>
+                </div>
+                <div className="popover-body">
+                  <div className="popover-field">
+                    <span className="field-label">Current Action</span>
+                    <p className="field-value action-value">{summary.action}</p>
+                  </div>
+                  <div className="popover-field">
+                    <span className="field-label">Location</span>
+                    <p className="field-value location-value">{summary.location}</p>
+                  </div>
+                  <div className="popover-field">
+                    <span className="field-label">Conversation</span>
+                    <p className="field-value chat-value">{summary.chatText}</p>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       {selectedPersona && (
         <PersonaStatePage
